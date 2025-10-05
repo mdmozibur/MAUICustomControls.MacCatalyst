@@ -1,0 +1,77 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:MAUICustomControls.MacCatalyst.Controls"
+             xmlns:customObjects="clr-namespace:MAUICustomControls.MacCatalyst.Controls.CustomObjects"
+             x:Class="MAUICustomControls.MacCatalyst.MainPage">
+
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="30,0"
+            Spacing="25">
+            <controls:PopoverButton 
+                x:Name="popoverButton" 
+                HorizontalOptions="Center" 
+                BorderColor="White" 
+                BorderWidth="2" 
+                WidthRequest="200"
+                PopoverDirection="Down"
+                Padding="10"
+                BackgroundColor="Gray">        
+
+                <Label Text="Click Me" FontSize="22" VerticalOptions="Center" HorizontalOptions="Center" />
+
+                <controls:PopoverButton.PopoverContent>
+                    <VerticalStackLayout Padding="10" Spacing="10" HorizontalOptions="Center">
+                        <Label FontSize="22" Text="This is a simple popover."/>
+                        <Button Text="Close" Clicked="Button_Clicked"/>
+                    </VerticalStackLayout>
+                </controls:PopoverButton.PopoverContent>
+            </controls:PopoverButton>
+
+            <controls:ToggleButton 
+                x:Name="toggleButton" 
+                HorizontalOptions="Center" 
+                TintColor="DodgerBlue"
+                WidthRequest="300"
+                HeightRequest="60"
+                Text="Toggle Me"/>
+        
+            <controls:ComboBox 
+                x:Name="comboBox"
+                UnselectedText="Select an option"
+                HorizontalOptions="Center" 
+                BorderThickness="1"
+                WidthRequest="200">
+                <controls:ComboBox.Options>
+                    <x:Array Type="{x:Type customObjects:SelectorOption}">
+                        <customObjects:SelectorOption Text="Option 1" SystemIconName="star"/>
+                        <customObjects:SelectorOption Text="Option 2" SystemIconName="heart"/>
+                        <customObjects:SelectorOption Text="Option 3" SystemIconName="bolt"/>
+                        <customObjects:SelectorOption Text="Option 4" SystemIconName="flame"/>
+                        <customObjects:SelectorOption Text="Option 5" SystemIconName="cloud"/>
+                    </x:Array>
+                </controls:ComboBox.Options>
+            </controls:ComboBox>
+        
+            <controls:ToggleDropdown 
+                x:Name="DropdownBox"
+                UnselectedText="Select an option"
+                HorizontalOptions="Center" 
+                BorderThickness="1"
+                WidthRequest="200">
+                <controls:ToggleDropdown.Options>
+                    <x:Array Type="{x:Type customObjects:SelectorOption}">
+                        <customObjects:SelectorOption Text="Option 1" SystemIconName="star"/>
+                        <customObjects:SelectorOption Text="Option 2" SystemIconName="heart"/>
+                        <customObjects:SelectorOption Text="Option 3" SystemIconName="bolt"/>
+                        <customObjects:SelectorOption Text="Option 4" SystemIconName="flame"/>
+                        <customObjects:SelectorOption Text="Option 5" SystemIconName="cloud"/>
+                    </x:Array>
+                </controls:ToggleDropdown.Options>
+            </controls:ToggleDropdown>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
