@@ -27,13 +27,13 @@ public sealed class ToggleButton : View
         set => SetValue(IconGlyphProperty, value);
     }
     public static readonly BindableProperty IconGlyphProperty =
-        BindableProperty.Create(nameof(IconGlyph), typeof(string), typeof(ToggleButton), "heart");
+        BindableProperty.Create(nameof(IconGlyph), typeof(string), typeof(ToggleButton), string.Empty);
 
-    public Color TintColor
+    public SolidColorBrush Foreground
     {
-        get => (Color)GetValue(TintColorProperty);
-        set => SetValue(TintColorProperty, value);
+        get => (SolidColorBrush)GetValue(ForegroundProperty);
+        set => SetValue(ForegroundProperty, value);
     }
-    public static readonly BindableProperty TintColorProperty =
-        BindableProperty.Create(nameof(TintColor), typeof(Color), typeof(ToggleButton), Colors.DodgerBlue);
+    public static readonly BindableProperty ForegroundProperty =
+        BindableProperty.Create(nameof(Foreground), typeof(SolidColorBrush), typeof(ToggleButton), Brush.DodgerBlue);
 }

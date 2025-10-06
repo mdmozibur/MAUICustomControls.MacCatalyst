@@ -4,6 +4,7 @@ using Microsoft.Maui.Handlers;
 using UIKit;
 using Microsoft.Maui.Platform;
 using MAUICustomControls.MacCatalyst.Controls;
+using ObjCRuntime;
 
 namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst;
 
@@ -40,11 +41,16 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
     private void ButtonTapped(object sender, EventArgs e)
     {
         // Sync the platform view's selected state back to the virtual view
-        if (PlatformView.Selected)
+        if (PlatformView.Selected && !VirtualView.IsChecked)
         {
             VirtualView.IsChecked = PlatformView.Selected;
             PlatformView.ShowsMenuAsPrimaryAction = true;
             PlatformView.ChangesSelectionAsPrimaryAction = false;
+
+            if (VirtualView.SelectedOption is null)
+            {
+                PlatformView.SetTitle(VirtualView.UnselectedText, UIControlState.Normal);
+            }
         }
     }
 
@@ -55,18 +61,34 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
 
     private void OptionChosen(UIAction action)
     {
-        // Find the selected option by matching the title
         var selectedOption = VirtualView.Options.FirstOrDefault(o => o.Text == action.Title);
 
-        // Update both the Text and SelectedOption
-        VirtualView.UnselectedText = action.Title;
+        var selectedMenuItem = PlatformView.Menu?.Children
+            .OfType<UIAction>()
+            .FirstOrDefault(item => item.State == UIMenuElementState.On);
+
+        if (selectedMenuItem is not null)
+            selectedMenuItem.State = UIMenuElementState.Off;
+
+        action.State = UIMenuElementState.On;
+
+        var actual_action = PlatformView.Menu?.Children
+            .OfType<UIAction>()
+            .FirstOrDefault(item => item.Identifier == action.Identifier);
+
+        if (actual_action is not null)
+            actual_action.State = UIMenuElementState.On;
+
         VirtualView.SelectedOption = selectedOption;
+
     }
 
     protected override UIButton CreatePlatformView()
     {
-        var button = new UIButton(UIButtonType.System);
-        button.ChangesSelectionAsPrimaryAction = true;
+        var button = new UIButton(UIButtonType.System)
+        {
+            ChangesSelectionAsPrimaryAction = true
+        };
         return button;
     }
 
@@ -77,24 +99,27 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
 
     public static void MapBorderThickness(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        handler.PlatformView.Layer.BorderWidth = (float)view.BorderThickness.Left;
+        handler.PlatformView.Layer.BorderWidth = (float)view.BorderThickness;
     }
 
     public static void MapSelectedOption(ToggleDropdownHandler handler, ToggleDropdown view)
     {
         if (view.SelectedOption.HasValue)
         {
-            var option = view.SelectedOption.Value;
-            var config = UIImageSymbolConfiguration.Create(UIImageSymbolScale.Medium);
-            var image = string.IsNullOrWhiteSpace(option.SystemIconName) ? null : UIImage.GetSystemImage(option.SystemIconName, config);
+            var selectedMenuItem = handler.PlatformView.Menu?.Children
+                .OfType<UIAction>()
+                .FirstOrDefault(item => item.Title == view.SelectedOption.Value.Text);
 
-            // Set the image on the button
-            handler.PlatformView.SetImage(image, UIControlState.Normal);
-            handler.PlatformView.SetTitle(option.Text, UIControlState.Normal);
+            if (selectedMenuItem is null)
+                return;
+
+            handler.PlatformView.SetImage(selectedMenuItem.Image, UIControlState.Normal);
+            handler.PlatformView.SetTitle(selectedMenuItem.Title, UIControlState.Normal);
         }
         else
         {
             handler.PlatformView.SetImage(null, UIControlState.Normal);
+            handler.PlatformView.SetTitle(view.UnselectedText, UIControlState.Normal);
         }
     }
     public static void MapIsSelected(ToggleDropdownHandler handler, ToggleDropdown view)
@@ -106,6 +131,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         {
             handler.PlatformView.ShowsMenuAsPrimaryAction = false;
             handler.PlatformView.ChangesSelectionAsPrimaryAction = true;
+            handler.PlatformView.Selected = false;
         }
     }
     

@@ -32,11 +32,24 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, UIButton>
 
     private void OptionChosen(UIAction action)
     {
-        // Find the selected option by matching the title
         var selectedOption = VirtualView.Options.FirstOrDefault(o => o.Text == action.Title);
 
-        // Update both the Text and SelectedOption
-        VirtualView.UnselectedText = action.Title;
+        var selectedMenuItem = PlatformView.Menu?.Children
+            .OfType<UIAction>()
+            .FirstOrDefault(item => item.State == UIMenuElementState.On);
+
+        if (selectedMenuItem is not null)
+            selectedMenuItem.State = UIMenuElementState.Off;
+
+        action.State = UIMenuElementState.On;
+
+        var actual_action = PlatformView.Menu?.Children
+            .OfType<UIAction>()
+            .FirstOrDefault(item => item.Identifier == action.Identifier);
+
+        if (actual_action is not null)
+            actual_action.State = UIMenuElementState.On;
+
         VirtualView.SelectedOption = selectedOption;
     }
 
@@ -54,24 +67,27 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, UIButton>
 
     public static void MapBorderThickness(ComboBoxHandler handler, ComboBox view)
     {
-        handler.PlatformView.Layer.BorderWidth = (float)view.BorderThickness.Left;
+        handler.PlatformView.Layer.BorderWidth = (float)view.BorderThickness;
     }
 
     public static void MapSelectedOption(ComboBoxHandler handler, ComboBox view)
     {
         if (view.SelectedOption.HasValue)
         {
-            var option = view.SelectedOption.Value;
-            var config = UIImageSymbolConfiguration.Create(UIImageSymbolScale.Medium);
-            var image = string.IsNullOrWhiteSpace(option.SystemIconName) ? null : UIImage.GetSystemImage(option.SystemIconName, config);
+            var selectedMenuItem = handler.PlatformView.Menu?.Children
+                .OfType<UIAction>()
+                .FirstOrDefault(item => item.Title == view.SelectedOption.Value.Text);
 
-            // Set the image on the button
-            handler.PlatformView.SetImage(image, UIControlState.Normal);
-            handler.PlatformView.SetTitle(option.Text, UIControlState.Normal);
+            if (selectedMenuItem is null)
+                return;
+
+            handler.PlatformView.SetImage(selectedMenuItem.Image, UIControlState.Normal);
+            handler.PlatformView.SetTitle(selectedMenuItem.Title, UIControlState.Normal);
         }
         else
         {
             handler.PlatformView.SetImage(null, UIControlState.Normal);
+            handler.PlatformView.SetTitle(view.UnselectedText, UIControlState.Normal);
         }
     }
     
@@ -92,7 +108,6 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, UIButton>
 
         var menu = UIMenu.Create(menuItems);
         handler.PlatformView.Menu = menu;
-        handler.PlatformView.ShowsMenuAsPrimaryAction = true;
     }
 
 }

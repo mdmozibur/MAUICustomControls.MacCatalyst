@@ -5,13 +5,13 @@ namespace MAUICustomControls.MacCatalyst.Controls;
 
 public sealed class ComboBox : ContentView
 {
-    public Thickness BorderThickness
+    public double BorderThickness
     {
-        get => (Thickness)GetValue(BorderThicknessProperty);
+        get => (double)GetValue(BorderThicknessProperty);
         set => SetValue(BorderThicknessProperty, value);
     }
     public static readonly BindableProperty BorderThicknessProperty =
-        BindableProperty.Create(nameof(BorderThickness), typeof(Thickness), typeof(ComboBox), new Thickness(1));
+        BindableProperty.Create(nameof(BorderThickness), typeof(double), typeof(ComboBox), 1.0);
 
     public static readonly BindableProperty UnselectedTextProperty =
         BindableProperty.Create(nameof(UnselectedText), typeof(string), typeof(ComboBox), string.Empty);

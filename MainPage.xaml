@@ -32,7 +32,8 @@
             <controls:ToggleButton 
                 x:Name="toggleButton" 
                 HorizontalOptions="Center" 
-                TintColor="DodgerBlue"
+                Foreground="SaddleBrown"
+                Background="Transparent"
                 WidthRequest="300"
                 HeightRequest="60"
                 Text="Toggle Me"/>
@@ -59,6 +60,8 @@
                 UnselectedText="Select an option"
                 HorizontalOptions="Center" 
                 BorderThickness="1"
+                BindingContext="{x:Reference toggleButton}"
+                IsChecked="{x:Binding Path=IsChecked}"
                 WidthRequest="200">
                 <controls:ToggleDropdown.Options>
                     <x:Array Type="{x:Type customObjects:SelectorOption}">

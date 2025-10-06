@@ -11,7 +11,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
     public static PropertyMapper<ToggleButton, ToggleButtonHandler> PropertyMapper = new(ViewMapper)
     {
         [nameof(ToggleButton.Text)] = MapText,
-        [nameof(ToggleButton.TintColor)] = MapColor,
+        [nameof(ToggleButton.Foreground)] = MapColor,
         [nameof(ToggleButton.IconGlyph)] = MapImageSource,
         [nameof(ToggleButton.IsChecked)] = MapIsSelected
     };
@@ -72,7 +72,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
 
     public static void MapColor(ToggleButtonHandler handler, ToggleButton view)
     {
-        handler.PlatformView.SetTitleColor(handler.VirtualView.TintColor.ToPlatform(), UIControlState.Normal);
+        handler.PlatformView.SetTitleColor(handler.VirtualView.Foreground.Color.ToPlatform(), UIControlState.Normal);
     }
 
     public static async void MapImageSource(ToggleButtonHandler handler, ToggleButton view)

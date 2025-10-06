@@ -22,13 +22,13 @@ public sealed class ToggleDropdown : ContentView
     public static readonly BindableProperty TintColorProperty =
         BindableProperty.Create(nameof(TintColor), typeof(Color), typeof(ToggleDropdown), Colors.DodgerBlue);
 
-    public Thickness BorderThickness
+    public double BorderThickness
     {
-        get => (Thickness)GetValue(BorderThicknessProperty);
+        get => (double)GetValue(BorderThicknessProperty);
         set => SetValue(BorderThicknessProperty, value);
     }
     public static readonly BindableProperty BorderThicknessProperty =
-        BindableProperty.Create(nameof(BorderThickness), typeof(Thickness), typeof(ToggleDropdown), new Thickness(1));
+        BindableProperty.Create(nameof(BorderThickness), typeof(double), typeof(ToggleDropdown), 1.0);
 
     public static readonly BindableProperty UnselectedTextProperty =
         BindableProperty.Create(nameof(UnselectedText), typeof(string), typeof(ToggleDropdown), string.Empty);
