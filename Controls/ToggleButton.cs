@@ -36,4 +36,12 @@ public sealed class ToggleButton : View
     }
     public static readonly BindableProperty ForegroundProperty =
         BindableProperty.Create(nameof(Foreground), typeof(SolidColorBrush), typeof(ToggleButton), Brush.DodgerBlue);
+
+    public double ImageSpacing
+    {
+        get => (double)GetValue(ImageSpacingProperty);
+        set => SetValue(ImageSpacingProperty, value);
+    }
+    public static readonly BindableProperty ImageSpacingProperty =
+        BindableProperty.Create(nameof(ImageSpacing), typeof(double), typeof(ToggleButton), 6.0);
 }

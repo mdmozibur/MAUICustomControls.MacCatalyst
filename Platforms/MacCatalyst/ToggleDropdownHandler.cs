@@ -134,11 +134,14 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
             handler.PlatformView.Selected = false;
         }
     }
-    
+
     public static void MapColor(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        handler.PlatformView.SetTitleColor(handler.VirtualView.TintColor.ToPlatform(), UIControlState.Normal);
+        var updatedConfig = handler.PlatformView.Configuration;
+        updatedConfig.BaseForegroundColor = view.TintColor.ToPlatform();
+        handler.PlatformView.Configuration = updatedConfig;
     }
+    
     private static void VirtualView_Options_CollectionChanged(ToggleDropdownHandler handler, ToggleDropdown view)
     {
         // Rebuild the menu

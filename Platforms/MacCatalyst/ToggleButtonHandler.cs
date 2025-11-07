@@ -13,7 +13,8 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         [nameof(ToggleButton.Text)] = MapText,
         [nameof(ToggleButton.Foreground)] = MapColor,
         [nameof(ToggleButton.IconGlyph)] = MapImageSource,
-        [nameof(ToggleButton.IsChecked)] = MapIsSelected
+        [nameof(ToggleButton.IsChecked)] = MapIsSelected,
+        [nameof(ToggleButton.ImageSpacing)] = MapImageSpacing,
     };
 
     public ToggleButtonHandler() : base(PropertyMapper) { }
@@ -23,10 +24,10 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
 
         // Set up the button configuration
         ConfigureButton(platformView);
-        
+
         // Use the proper event to handle selection changes
         platformView.AddTarget(ButtonTapped, UIControlEvent.TouchUpInside);
-        
+
         MapText(this, VirtualView);
         MapImageSource(this, VirtualView);
         MapIsSelected(this, VirtualView);
@@ -35,7 +36,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
     private void ConfigureButton(UIButton button)
     {
         button.ChangesSelectionAsPrimaryAction = true;
-        
+
         // If you want to change background colors
         button.Configuration = UIButtonConfiguration.PlainButtonConfiguration;
     }
@@ -52,7 +53,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         platformView.RemoveTarget(ButtonTapped, UIControlEvent.TouchUpInside);
         base.DisconnectHandler(platformView);
     }
-    
+
     private void ButtonTapped(object sender, EventArgs e)
     {
         // Sync the platform view's selected state back to the virtual view
@@ -61,7 +62,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
 
     public static void MapIsSelected(ToggleButtonHandler handler, ToggleButton view)
     {
-        if(handler.PlatformView.Selected != view.IsChecked)
+        if (handler.PlatformView.Selected != view.IsChecked)
             handler.PlatformView.Selected = view.IsChecked;
     }
 
@@ -77,22 +78,16 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
 
     public static async void MapImageSource(ToggleButtonHandler handler, ToggleButton view)
     {
-        // if (view.ImageSource != null)
-        // {
-        //     var imageSourceService = handler.GetRequiredService<IImageSourceService>();
-        //     var result = await imageSourceService.GetImageAsync(view.ImageSource);
-
-        //     if (result?.Value != null)
-        //     {
-        //         handler.PlatformView.SetImage(result.Value, UIControlState.Normal);
-        //     }
-        // }
-        // else
-        // {
-        //     handler.PlatformView.SetImage(null, UIControlState.Normal);
-        // }
         var config = UIImageSymbolConfiguration.Create(UIImageSymbolScale.Medium);
         var image = UIImage.GetSystemImage(view.IconGlyph, config);
+        image.ApplyTintColor(view.Foreground.Color.ToPlatform());
         handler.PlatformView.SetImage(image, UIControlState.Normal);
     }
+    
+
+    private static void MapImageSpacing(ToggleButtonHandler handler, ToggleButton button)
+    {
+        throw new NotImplementedException();
+    }
+
 }

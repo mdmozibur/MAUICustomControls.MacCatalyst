@@ -36,6 +36,7 @@
                 Background="Transparent"
                 WidthRequest="300"
                 HeightRequest="60"
+                IconGlyph="square.split.bottomrightquarter"
                 Text="Toggle Me"/>
         
             <controls:ComboBox 
@@ -59,9 +60,8 @@
                 x:Name="DropdownBox"
                 UnselectedText="Select an option"
                 HorizontalOptions="Center" 
+                TintColor="DodgerBlue"
                 BorderThickness="1"
-                BindingContext="{x:Reference toggleButton}"
-                IsChecked="{x:Binding Path=IsChecked}"
                 WidthRequest="200">
                 <controls:ToggleDropdown.Options>
                     <x:Array Type="{x:Type customObjects:SelectorOption}">
@@ -73,6 +73,9 @@
                     </x:Array>
                 </controls:ToggleDropdown.Options>
             </controls:ToggleDropdown>
+
+            <controls:CheckBox Text="Check me"
+                HorizontalOptions="Center" />
 
         </VerticalStackLayout>
     </ScrollView>
