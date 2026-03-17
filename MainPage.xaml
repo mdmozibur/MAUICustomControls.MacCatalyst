@@ -77,6 +77,22 @@
             <controls:CheckBox Text="Check me"
                 HorizontalOptions="Center" />
 
+            <VerticalStackLayout Spacing="14">
+                <Label Text="Switches"
+                    FontSize="28"
+                    FontAttributes="Bold" />
+
+                <controls:ToggleSwitch Text="One"
+                    HorizontalOptions="Fill"
+                    IsOn="True"
+                    OnColor="DodgerBlue"
+                    Foreground="White" />
+
+                <controls:ToggleSwitch Text="Two"
+                    HorizontalOptions="Fill"
+                    Foreground="White" />
+            </VerticalStackLayout>
+
         </VerticalStackLayout>
     </ScrollView>
 

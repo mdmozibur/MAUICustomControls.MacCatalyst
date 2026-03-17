@@ -4,7 +4,7 @@ public sealed class ToggleButton : View
 {
 
     public static readonly BindableProperty IsCheckedProperty =
-        BindableProperty.Create(nameof(IsChecked), typeof(bool), typeof(ToggleButton), false);
+        BindableProperty.Create(nameof(IsChecked), typeof(bool), typeof(ToggleButton), false, BindingMode.TwoWay);
 
     public bool IsChecked
     {

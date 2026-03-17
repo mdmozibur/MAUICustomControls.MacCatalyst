@@ -1,10 +1,8 @@
 
-
 using Microsoft.Maui.Handlers;
-using UIKit;
 using Microsoft.Maui.Platform;
 using MAUICustomControls.MacCatalyst.Controls;
-using ObjCRuntime;
+using UIKit;
 
 namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst;
 
@@ -28,59 +26,47 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
     {
         base.ConnectHandler(platformView);
 
-        // Set up the button configuration
-        platformView.Configuration = UIButtonConfiguration.PlainButtonConfiguration;
-        
-        // Use the proper event to handle selection changes
+        ConfigureButton(platformView);
         platformView.AddTarget(ButtonTapped, UIControlEvent.TouchUpInside);
-        
-        MapText(this, VirtualView);
-        MapIsSelected(this, VirtualView);
-    }
 
-    private void ButtonTapped(object sender, EventArgs e)
-    {
-        // Sync the platform view's selected state back to the virtual view
-        if (PlatformView.Selected && !VirtualView.IsChecked)
-        {
-            VirtualView.IsChecked = PlatformView.Selected;
-            PlatformView.ShowsMenuAsPrimaryAction = true;
-            PlatformView.ChangesSelectionAsPrimaryAction = false;
-
-            if (VirtualView.SelectedOption is null)
-            {
-                PlatformView.SetTitle(VirtualView.UnselectedText, UIControlState.Normal);
-            }
-        }
+        UpdateMenu(platformView, VirtualView, OptionChosen);
+        UpdateButtonAppearance(platformView, VirtualView);
     }
 
     protected override void DisconnectHandler(UIButton platformView)
     {
+        platformView.RemoveTarget(ButtonTapped, UIControlEvent.TouchUpInside);
         base.DisconnectHandler(platformView);
+    }
+
+    private void ConfigureButton(UIButton button)
+    {
+        button.Configuration = UIButtonConfiguration.PlainButtonConfiguration;
+        button.ClipsToBounds = true;
+        button.Layer.CornerRadius = 12;
+        button.TitleLabel.LineBreakMode = UILineBreakMode.TailTruncation;
+        button.ChangesSelectionAsPrimaryAction = false;
+        button.ShowsMenuAsPrimaryAction = false;
+    }
+
+    private void ButtonTapped(object? sender, EventArgs e)
+    {
+        if (!VirtualView.IsChecked)
+        {
+            VirtualView.IsChecked = true;
+        }
     }
 
     private void OptionChosen(UIAction action)
     {
-        var selectedOption = VirtualView.Options.FirstOrDefault(o => o.Text == action.Title);
+        var selectedOption = VirtualView.Options.FirstOrDefault(o => string.Equals(o.Text, action.Title, StringComparison.Ordinal));
+        if (string.IsNullOrWhiteSpace(selectedOption.Text))
+        {
+            return;
+        }
 
-        var selectedMenuItem = PlatformView.Menu?.Children
-            .OfType<UIAction>()
-            .FirstOrDefault(item => item.State == UIMenuElementState.On);
-
-        if (selectedMenuItem is not null)
-            selectedMenuItem.State = UIMenuElementState.Off;
-
-        action.State = UIMenuElementState.On;
-
-        var actual_action = PlatformView.Menu?.Children
-            .OfType<UIAction>()
-            .FirstOrDefault(item => item.Identifier == action.Identifier);
-
-        if (actual_action is not null)
-            actual_action.State = UIMenuElementState.On;
-
+        VirtualView.IsChecked = true;
         VirtualView.SelectedOption = selectedOption;
-
     }
 
     protected override UIButton CreatePlatformView()
@@ -94,72 +80,92 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
 
     public static void MapText(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        handler.PlatformView.SetTitle(view.UnselectedText, UIControlState.Normal);
+        UpdateButtonAppearance(handler.PlatformView, view);
     }
 
     public static void MapBorderThickness(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        handler.PlatformView.Layer.BorderWidth = (float)view.BorderThickness;
+        UpdateButtonAppearance(handler.PlatformView, view);
     }
 
     public static void MapSelectedOption(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        if (view.SelectedOption.HasValue)
-        {
-            var selectedMenuItem = handler.PlatformView.Menu?.Children
-                .OfType<UIAction>()
-                .FirstOrDefault(item => item.Title == view.SelectedOption.Value.Text);
-
-            if (selectedMenuItem is null)
-                return;
-
-            handler.PlatformView.SetImage(selectedMenuItem.Image, UIControlState.Normal);
-            handler.PlatformView.SetTitle(selectedMenuItem.Title, UIControlState.Normal);
-        }
-        else
-        {
-            handler.PlatformView.SetImage(null, UIControlState.Normal);
-            handler.PlatformView.SetTitle(view.UnselectedText, UIControlState.Normal);
-        }
+        UpdateMenu(handler.PlatformView, view, handler.OptionChosen);
+        UpdateButtonAppearance(handler.PlatformView, view);
     }
+
     public static void MapIsSelected(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        if (handler.PlatformView.Selected != view.IsChecked)
-            handler.PlatformView.Selected = view.IsChecked;
-
-        if (!view.IsChecked)
-        {
-            handler.PlatformView.ShowsMenuAsPrimaryAction = false;
-            handler.PlatformView.ChangesSelectionAsPrimaryAction = true;
-            handler.PlatformView.Selected = false;
-        }
+        UpdateButtonAppearance(handler.PlatformView, view);
     }
 
     public static void MapColor(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        var updatedConfig = handler.PlatformView.Configuration;
-        updatedConfig.BaseForegroundColor = view.TintColor.ToPlatform();
-        handler.PlatformView.Configuration = updatedConfig;
+        UpdateButtonAppearance(handler.PlatformView, view);
     }
-    
+
     private static void VirtualView_Options_CollectionChanged(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        // Rebuild the menu
-        handler.PlatformView.Menu = null;
+        UpdateMenu(handler.PlatformView, view, handler.OptionChosen);
+        UpdateButtonAppearance(handler.PlatformView, view);
+    }
 
-        var menuItems = new UIAction[view.Options.Count];
+    private static void UpdateMenu(UIButton button, ToggleDropdown view, UIActionHandler optionChosen)
+    {
+        if (view.Options is null || view.Options.Count == 0)
+        {
+            button.Menu = null;
+            return;
+        }
+
+        var selectedText = view.SelectedOption?.Text;
         var config = UIImageSymbolConfiguration.Create(UIImageSymbolScale.Medium);
+        var menuItems = new UIAction[view.Options.Count];
 
         for (int i = 0; i < view.Options.Count; i++)
         {
             var option = view.Options[i];
             var image = string.IsNullOrWhiteSpace(option.SystemIconName) ? null : UIImage.GetSystemImage(option.SystemIconName, config);
-            menuItems[i] = UIAction.Create(option.Text, image, null, handler.OptionChosen);
+            var action = UIAction.Create(option.Text, image, null, optionChosen);
+            action.State = string.Equals(option.Text, selectedText, StringComparison.Ordinal) ? UIMenuElementState.On : UIMenuElementState.Off;
+            menuItems[i] = action;
         }
 
-        var menu = UIMenu.Create(menuItems);
-        handler.PlatformView.Menu = menu;
-        handler.PlatformView.ShowsMenuAsPrimaryAction = true;
+        button.Menu = UIMenu.Create(menuItems);
+    }
+
+    private static void UpdateButtonAppearance(UIButton button, ToggleDropdown view)
+    {
+        var tintColor = view.TintColor.ToPlatform();
+        var configuration = button.Configuration ?? UIButtonConfiguration.PlainButtonConfiguration;
+        var title = view.SelectedOption?.Text ?? view.UnselectedText;
+        var image = CreateSelectedImage(view.SelectedOption, tintColor);
+
+        configuration.Title = title;
+        configuration.Image = image;
+        configuration.ImagePlacement = NSDirectionalRectEdge.Leading;
+        configuration.ImagePadding = image is null ? 0 : 8;
+        configuration.BaseForegroundColor = tintColor;
+        configuration.ContentInsets = new NSDirectionalEdgeInsets(10, 14, 10, 14);
+
+        button.Configuration = configuration;
+        button.Selected = view.IsChecked;
+        button.ShowsMenuAsPrimaryAction = view.IsChecked && button.Menu is not null;
+        button.Layer.BorderWidth = (float)view.BorderThickness;
+        button.Layer.BorderColor = tintColor.ColorWithAlpha(view.IsChecked ? 0.75f : 0.35f).CGColor;
+        button.BackgroundColor = view.IsChecked ? tintColor.ColorWithAlpha(0.14f) : UIColor.Clear;
+    }
+
+    private static UIImage? CreateSelectedImage(Controls.CustomObjects.SelectorOption? selectedOption, UIColor tintColor)
+    {
+        if (!selectedOption.HasValue || string.IsNullOrWhiteSpace(selectedOption.Value.SystemIconName))
+        {
+            return null;
+        }
+
+        var config = UIImageSymbolConfiguration.Create(UIImageSymbolScale.Medium);
+        var image = UIImage.GetSystemImage(selectedOption.Value.SystemIconName, config);
+        return image?.ApplyTintColor(tintColor, UIImageRenderingMode.AlwaysOriginal);
     }
 
 }
