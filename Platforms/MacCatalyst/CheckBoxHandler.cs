@@ -12,6 +12,7 @@ public sealed class CheckBoxHandler : ViewHandler<CheckBox, UIButton>
     public static PropertyMapper<CheckBox, CheckBoxHandler> PropertyMapper = new(ViewMapper)
     {
         [nameof(CheckBox.Text)] = MapText,
+        [nameof(CheckBox.FontSize)] = MapFontSize,
         [nameof(CheckBox.BorderThickness)] = MapBorderThickness,
         [nameof(CheckBox.IsChecked)] = MapIsSelected,
         [nameof(CheckBox.Foreground)] = MapColor,
@@ -52,6 +53,12 @@ public sealed class CheckBoxHandler : ViewHandler<CheckBox, UIButton>
     public static void MapText(CheckBoxHandler handler, CheckBox view)
     {
         handler.PlatformView.SetTitle(view.Text, UIControlState.Normal);
+    }
+
+    public static void MapFontSize(CheckBoxHandler handler, CheckBox view)
+    {
+        var currentFont = handler.PlatformView.TitleLabel?.Font;
+        handler.PlatformView.TitleLabel.Font = currentFont?.WithSize((nfloat)view.FontSize) ?? UIFont.SystemFontOfSize((nfloat)view.FontSize);
     }
 
     public static void MapBorderThickness(CheckBoxHandler handler, CheckBox view)
