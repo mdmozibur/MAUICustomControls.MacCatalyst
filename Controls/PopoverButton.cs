@@ -5,9 +5,9 @@ public sealed class PopoverButton : ContentView
 	public static readonly BindableProperty PopoverContentProperty =
 		BindableProperty.Create(nameof(PopoverContent), typeof(View), typeof(PopoverButton), null);
 
-	public View PopoverContent
+	public View? PopoverContent
 	{
-		get => (View)GetValue(PopoverContentProperty);
+		get => (View?)GetValue(PopoverContentProperty);
 		set => SetValue(PopoverContentProperty, value);
 	}
 	public static readonly BindableProperty BorderColorProperty =
@@ -35,15 +35,8 @@ public sealed class PopoverButton : ContentView
 		set => SetValue(PopoverDirectionProperty, value);
 	}
 
-	internal Action HidePopoverAction { get; set; }
-	public PopoverButton()
-	{
-	}
+	internal Action? HidePopoverAction { get; set; }
 
-	protected override void OnApplyTemplate()
-	{
-		base.OnApplyTemplate();
-	}
 	public void HidePopover()
 	{
 		HidePopoverAction?.Invoke();

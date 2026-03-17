@@ -5,7 +5,7 @@ using UIKit;
 
 namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
 {
-    public class PopoverButtonHandler : ContentViewHandler
+    public sealed class PopoverButtonHandler : ContentViewHandler
     {
         private UITapGestureRecognizer? _tapGestureRecognizer;
         private PopoverDelegate? _popoverDelegate;
@@ -31,13 +31,7 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
 
             if (VirtualView is PopoverButton popoverButton)
             {
-                popoverButton.HidePopoverAction = () =>
-                {
-                    if (_popoverController != null && _popoverController.TryGetTarget(out var controller) && controller.IsViewLoaded && controller.View.Window != null)
-                    {
-                        controller.DismissViewController(true, CleanupPopover);
-                    }
-                };
+                popoverButton.HidePopoverAction = HideActivePopover;
             }
         }
 
@@ -51,7 +45,11 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
             if (_tapGestureRecognizer != null)
             {
                 platformView.RemoveGestureRecognizer(_tapGestureRecognizer);
+                _tapGestureRecognizer.Dispose();
+                _tapGestureRecognizer = null;
             }
+
+            HideActivePopover();
             base.DisconnectHandler(platformView);
         }
 
@@ -67,6 +65,12 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
             if (VirtualView is not PopoverButton popoverButton || popoverButton.PopoverContent == null)
                 return;
 
+            if (TryGetActivePopover(out var activePopover))
+            {
+                activePopover.DismissViewController(true, CleanupPopover);
+                return;
+            }
+
             var popoverContent = popoverButton.PopoverContent;
             var mauiContext = MauiContext ?? throw new InvalidOperationException("MauiContext is null");
 
@@ -76,14 +80,14 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
                 View = popoverContent.ToPlatform(mauiContext)
             };
             var measure = popoverContent.Measure(double.PositiveInfinity, double.PositiveInfinity);
-            viewController.PreferredContentSize = new CoreGraphics.CGSize(measure.Width, measure.Height);
+            viewController.PreferredContentSize = new CoreGraphics.CGSize(Math.Max(1, measure.Width), Math.Max(1, measure.Height));
             _popoverController = new WeakReference<UIViewController>(viewController);
 
             var popover = viewController.PopoverPresentationController;
             if (popover != null)
             {
                 popover.SourceView = PlatformView;
-                popover.SourceRect = PlatformView.Bounds;
+                popover.SourceRect = PlatformView.Bounds.IsEmpty ? new CoreGraphics.CGRect(0, 0, PlatformView.Frame.Width, PlatformView.Frame.Height) : PlatformView.Bounds;
                 popover.PermittedArrowDirections = popoverButton.PopoverDirection switch
                 {
                     PopoverDirection.Up => UIPopoverArrowDirection.Down,
@@ -97,8 +101,8 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
                 popover.Delegate = _popoverDelegate;
             }
 
-            var rootViewController = UIApplication.SharedApplication.KeyWindow?.RootViewController;
-            rootViewController?.PresentViewController(viewController, true, null);
+            var presentingController = GetPresentingViewController();
+            presentingController?.PresentViewController(viewController, true, null);
         }
 
         internal void CleanupPopover()
@@ -107,7 +111,54 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
             {
                 popoverButton.PopoverContent.Handler.DisconnectHandler();
             }
+
+            _popoverDelegate = null;
             _popoverController = null;
+        }
+
+        private void HideActivePopover()
+        {
+            if (TryGetActivePopover(out var controller))
+            {
+                controller.DismissViewController(true, CleanupPopover);
+            }
+        }
+
+        private bool TryGetActivePopover(out UIViewController controller)
+        {
+            if (_popoverController != null && _popoverController.TryGetTarget(out var currentController) && currentController.PresentingViewController != null)
+            {
+                controller = currentController;
+                return true;
+            }
+
+            controller = null!;
+            return false;
+        }
+
+        private static UIViewController? GetPresentingViewController()
+        {
+            foreach (var scene in UIApplication.SharedApplication.ConnectedScenes.OfType<UIWindowScene>())
+            {
+                var window = scene.Windows.FirstOrDefault(candidate => candidate.IsKeyWindow) ?? scene.Windows.FirstOrDefault();
+                if (window?.RootViewController is UIViewController rootViewController)
+                {
+                    return GetTopViewController(rootViewController);
+                }
+            }
+
+            return null;
+        }
+
+        private static UIViewController GetTopViewController(UIViewController controller)
+        {
+            var current = controller;
+            while (current.PresentedViewController is UIViewController presented)
+            {
+                current = presented;
+            }
+
+            return current;
         }
     }
 }

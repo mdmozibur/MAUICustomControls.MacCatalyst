@@ -1,4 +1,5 @@
 
+using System.Collections.ObjectModel;
 using MAUICustomControls.MacCatalyst.Controls.CustomObjects;
 
 namespace MAUICustomControls.MacCatalyst.Controls;
@@ -6,7 +7,7 @@ namespace MAUICustomControls.MacCatalyst.Controls;
 public sealed class ToggleDropdown : ContentView
 {
     public static readonly BindableProperty IsCheckedProperty =
-        BindableProperty.Create(nameof(IsChecked), typeof(bool), typeof(ToggleDropdown), false);
+        BindableProperty.Create(nameof(IsChecked), typeof(bool), typeof(ToggleDropdown), false, BindingMode.TwoWay);
 
     public bool IsChecked
     {
@@ -53,6 +54,11 @@ public sealed class ToggleDropdown : ContentView
         set => SetValue(SelectedOptionProperty, value);
     }
     public static readonly BindableProperty SelectedOptionProperty =
-        BindableProperty.Create(nameof(SelectedOption), typeof(SelectorOption?), typeof(ToggleDropdown), null);
+        BindableProperty.Create(nameof(SelectedOption), typeof(SelectorOption?), typeof(ToggleDropdown), null, BindingMode.TwoWay);
+
+    public ToggleDropdown()
+    {
+        Options = new ObservableCollection<SelectorOption>();
+    }
 
 }
