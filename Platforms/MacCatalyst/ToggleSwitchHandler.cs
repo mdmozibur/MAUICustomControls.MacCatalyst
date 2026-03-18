@@ -12,6 +12,8 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
     public static PropertyMapper<ToggleSwitch, ToggleSwitchHandler> PropertyMapper = new(ViewMapper)
     {
         [nameof(ToggleSwitch.Text)] = MapText,
+        [nameof(ToggleSwitch.FontSize)] = MapFontSize,
+        [nameof(ToggleSwitch.Padding)] = MapPadding,
         [nameof(ToggleSwitch.IsOn)] = MapIsOn,
         [nameof(ToggleSwitch.Foreground)] = MapForeground,
         [nameof(ToggleSwitch.OnColor)] = MapOnColor,
@@ -33,6 +35,8 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
         platformView.SwitchControl.AddTarget(ValueChanged, UIControlEvent.ValueChanged);
 
         MapText(this, VirtualView);
+        MapFontSize(this, VirtualView);
+        MapPadding(this, VirtualView);
         MapIsOn(this, VirtualView);
         MapForeground(this, VirtualView);
         MapOnColor(this, VirtualView);
@@ -68,6 +72,21 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
         handler.PlatformView.SetNeedsLayout();
     }
 
+    public static void MapFontSize(ToggleSwitchHandler handler, ToggleSwitch view)
+    {
+        var currentFont = handler.PlatformView.TextLabel.Font;
+        handler.PlatformView.TextLabel.Font = currentFont?.WithSize((nfloat)view.FontSize) ?? UIFont.SystemFontOfSize((nfloat)view.FontSize);
+        handler.PlatformView.InvalidateIntrinsicContentSize();
+        handler.PlatformView.SetNeedsLayout();
+    }
+
+    public static void MapPadding(ToggleSwitchHandler handler, ToggleSwitch view)
+    {
+        handler.PlatformView.Padding = view.Padding;
+        handler.PlatformView.InvalidateIntrinsicContentSize();
+        handler.PlatformView.SetNeedsLayout();
+    }
+
     public static void MapIsOn(ToggleSwitchHandler handler, ToggleSwitch view)
     {
         if (handler.PlatformView.SwitchControl.On != view.IsOn)
@@ -91,6 +110,8 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
         private static readonly nfloat Spacing = 12;
         internal const double MeasurementLimit = 10000;
 
+        public Thickness Padding { get; set; }
+
         public UILabel TextLabel { get; } = new()
         {
             Lines = 1,
@@ -112,24 +133,28 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
 
         public override CGSize SizeThatFits(CGSize size)
         {
+            var padding = GetPadding();
             var switchSize = SwitchControl.SizeThatFits(new CGSize((nfloat)MeasurementLimit, (nfloat)MeasurementLimit));
             var spacing = GetSpacing();
             var unconstrainedLabelSize = MeasureLabel((nfloat)MeasurementLimit);
+            var contentWidthLimit = size.Width > 0 && size.Width < MeasurementLimit
+                ? (nfloat)Math.Max(0, size.Width - padding.Left - padding.Right)
+                : unconstrainedLabelSize.Width + spacing + switchSize.Width;
 
             var availableWidth = size.Width > 0 && size.Width < MeasurementLimit
-                ? size.Width
+                ? contentWidthLimit
                 : unconstrainedLabelSize.Width + spacing + switchSize.Width;
 
             var labelMaxWidth = (nfloat)Math.Max(0, availableWidth - spacing - switchSize.Width);
             var labelSize = MeasureLabel(labelMaxWidth <= 0 ? unconstrainedLabelSize.Width : labelMaxWidth);
-            var measuredWidth = labelSize.Width + spacing + switchSize.Width;
+            var measuredWidth = labelSize.Width + spacing + switchSize.Width + padding.Left + padding.Right;
 
             if (size.Width > 0 && size.Width < MeasurementLimit)
             {
                 measuredWidth = (nfloat)Math.Min(measuredWidth, size.Width);
             }
 
-            var measuredHeight = (nfloat)Math.Max(labelSize.Height, switchSize.Height);
+            var measuredHeight = (nfloat)Math.Max(labelSize.Height, switchSize.Height) + padding.Top + padding.Bottom;
             return new CGSize(measuredWidth, measuredHeight);
         }
 
@@ -143,21 +168,26 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
                 layoutSize = SizeThatFits(new CGSize((nfloat)MeasurementLimit, (nfloat)MeasurementLimit));
             }
 
+            var padding = GetPadding();
+            var contentWidth = (nfloat)Math.Max(0, layoutSize.Width - padding.Left - padding.Right);
+            var contentHeight = (nfloat)Math.Max(0, layoutSize.Height - padding.Top - padding.Bottom);
             var switchSize = SwitchControl.SizeThatFits(layoutSize);
             var spacing = GetSpacing();
-            var switchX = (nfloat)Math.Max(0, layoutSize.Width - switchSize.Width);
+            var switchX = padding.Left + (nfloat)Math.Max(0, contentWidth - switchSize.Width);
             var labelMaxWidth = (nfloat)Math.Max(0, switchX - spacing);
+            labelMaxWidth = (nfloat)Math.Max(0, labelMaxWidth - padding.Left);
             var labelSize = MeasureLabel(labelMaxWidth);
+            var contentTop = padding.Top;
 
             TextLabel.Frame = new CGRect(
-                0,
-                (layoutSize.Height - labelSize.Height) / 2,
+                padding.Left,
+                contentTop + (contentHeight - labelSize.Height) / 2,
                 labelMaxWidth,
                 labelSize.Height);
 
             SwitchControl.Frame = new CGRect(
                 switchX,
-                (layoutSize.Height - switchSize.Height) / 2,
+                contentTop + (contentHeight - switchSize.Height) / 2,
                 switchSize.Width,
                 switchSize.Height);
         }
@@ -171,6 +201,11 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
         private nfloat GetSpacing()
         {
             return string.IsNullOrWhiteSpace(TextLabel.Text) ? 0 : Spacing;
+        }
+
+        private UIEdgeInsets GetPadding()
+        {
+            return new UIEdgeInsets((nfloat)Padding.Top, (nfloat)Padding.Left, (nfloat)Padding.Bottom, (nfloat)Padding.Right);
         }
     }
 }

@@ -3,7 +3,9 @@ namespace MAUICustomControls.MacCatalyst.Controls;
 public sealed class ToggleSwitch : View
 {
     public static readonly BindableProperty IsOnProperty =
-        BindableProperty.Create(nameof(IsOn), typeof(bool), typeof(ToggleSwitch), false, BindingMode.TwoWay);
+        BindableProperty.Create(nameof(IsOn), typeof(bool), typeof(ToggleSwitch), false, BindingMode.TwoWay, propertyChanged: OnIsOnChanged);
+
+    public event EventHandler? Toggled;
 
     public bool IsOn
     {
@@ -18,6 +20,24 @@ public sealed class ToggleSwitch : View
     {
         get => (string)GetValue(TextProperty);
         set => SetValue(TextProperty, value);
+    }
+
+    public static readonly BindableProperty FontSizeProperty =
+        BindableProperty.Create(nameof(FontSize), typeof(double), typeof(ToggleSwitch), 14d);
+
+    public double FontSize
+    {
+        get => (double)GetValue(FontSizeProperty);
+        set => SetValue(FontSizeProperty, value);
+    }
+
+    public static readonly BindableProperty PaddingProperty =
+        BindableProperty.Create(nameof(Padding), typeof(Thickness), typeof(ToggleSwitch), default(Thickness));
+
+    public Thickness Padding
+    {
+        get => (Thickness)GetValue(PaddingProperty);
+        set => SetValue(PaddingProperty, value);
     }
 
     public static readonly BindableProperty ForegroundProperty =
@@ -36,5 +56,15 @@ public sealed class ToggleSwitch : View
     {
         get => (Color)GetValue(OnColorProperty);
         set => SetValue(OnColorProperty, value);
+    }
+
+    private static void OnIsOnChanged(BindableObject bindable, object oldValue, object newValue)
+    {
+        if (bindable is not ToggleSwitch toggleSwitch || newValue is not bool)
+        {
+            return;
+        }
+
+        toggleSwitch.Toggled?.Invoke(toggleSwitch, EventArgs.Empty);
     }
 }
