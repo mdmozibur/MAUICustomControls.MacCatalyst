@@ -11,6 +11,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
     public static PropertyMapper<ToggleDropdown, ToggleDropdownHandler> PropertyMapper = new(ViewMapper)
     {
         [nameof(ToggleDropdown.UnselectedText)] = MapText,
+        [nameof(ToggleDropdown.HorizontalContentAlignment)] = MapHorizontalContentAlignment,
         [nameof(ToggleDropdown.BorderThickness)] = MapBorderThickness,
         [nameof(ToggleDropdown.Options)] = VirtualView_Options_CollectionChanged,
         [nameof(ToggleDropdown.SelectedOption)] = MapSelectedOption,
@@ -83,6 +84,11 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         UpdateButtonAppearance(handler.PlatformView, view);
     }
 
+    public static void MapHorizontalContentAlignment(ToggleDropdownHandler handler, ToggleDropdown view)
+    {
+        UpdateButtonAppearance(handler.PlatformView, view);
+    }
+
     public static void MapBorderThickness(ToggleDropdownHandler handler, ToggleDropdown view)
     {
         UpdateButtonAppearance(handler.PlatformView, view);
@@ -149,6 +155,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         configuration.ContentInsets = new NSDirectionalEdgeInsets(10, 14, 10, 14);
 
         button.Configuration = configuration;
+        button.HorizontalAlignment = ResolveContentHorizontalAlignment(view.HorizontalContentAlignment);
         button.Selected = view.IsChecked;
         button.ShowsMenuAsPrimaryAction = view.IsChecked && button.Menu is not null;
         button.Layer.BorderWidth = (float)view.BorderThickness;
@@ -166,6 +173,18 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         var config = UIImageSymbolConfiguration.Create(UIImageSymbolScale.Medium);
         var image = UIImage.GetSystemImage(selectedOption.Value.SystemIconName, config);
         return image?.ApplyTintColor(tintColor, UIImageRenderingMode.AlwaysOriginal);
+    }
+
+    private static UIControlContentHorizontalAlignment ResolveContentHorizontalAlignment(LayoutOptions alignment)
+    {
+        return alignment.Alignment switch
+        {
+            LayoutAlignment.Start => UIControlContentHorizontalAlignment.Left,
+            LayoutAlignment.Center => UIControlContentHorizontalAlignment.Center,
+            LayoutAlignment.End => UIControlContentHorizontalAlignment.Right,
+            LayoutAlignment.Fill => UIControlContentHorizontalAlignment.Fill,
+            _ => UIControlContentHorizontalAlignment.Center,
+        };
     }
 
 }
