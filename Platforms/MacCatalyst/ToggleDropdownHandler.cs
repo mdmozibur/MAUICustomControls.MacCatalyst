@@ -54,6 +54,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
     {
         if (!VirtualView.IsChecked)
         {
+            VirtualView.MarkNextToggleAsUserInitiated();
             VirtualView.IsChecked = true;
         }
     }
@@ -66,6 +67,8 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
             return;
         }
 
+        VirtualView.MarkNextToggleAsUserInitiated();
+        VirtualView.MarkNextSelectionAsUserInitiated();
         VirtualView.IsChecked = true;
         VirtualView.SelectedOption = selectedOption;
     }

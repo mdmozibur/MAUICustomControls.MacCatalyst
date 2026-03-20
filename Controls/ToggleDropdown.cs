@@ -4,11 +4,14 @@ using MAUICustomControls.MacCatalyst.Controls.CustomObjects;
 
 namespace MAUICustomControls.MacCatalyst.Controls;
 
-public sealed class ToggleDropdown : ContentView
+public sealed partial class ToggleDropdown : ContentView
 {
-    public event EventHandler? Toggled;
+    private bool _nextToggleIsUserInitiated;
+    private bool _nextSelectionIsUserInitiated;
+
+    public event EventHandler<ToggleDropdownToggleChangedEventArgs>? Toggled;
     public event EventHandler? Checked;
-    public event EventHandler? SelectionChanged;
+    public event EventHandler<ToggleDropdownSelectionChangedEventArgs>? SelectionChanged;
 
     public static readonly BindableProperty IsCheckedProperty =
         BindableProperty.Create(nameof(IsChecked), typeof(bool), typeof(ToggleDropdown), false, BindingMode.TwoWay, propertyChanged: OnIsCheckedChanged);
@@ -105,16 +108,30 @@ public sealed class ToggleDropdown : ContentView
     public static readonly BindableProperty SelectedOptionProperty =
         BindableProperty.Create(nameof(SelectedOption), typeof(SelectorOption?), typeof(ToggleDropdown), null, BindingMode.TwoWay, propertyChanged: OnSelectedOptionChanged);
 
-    public SelectorOption? SelectedItem
-    {
-        get => SelectedOption;
-        set => SelectedOption = value;
-    }
-
     public ToggleDropdown()
     {
         Options = new ObservableCollection<SelectorOption>();
     }
+
+    internal void SetSelectedOptionFromCompatibility(SelectorOption? selectedOption, bool isProgrammatic)
+    {
+        _nextSelectionIsUserInitiated = !isProgrammatic;
+        SelectedOption = selectedOption;
+    }
+
+    internal void MarkNextToggleAsUserInitiated()
+    {
+        _nextToggleIsUserInitiated = true;
+    }
+
+    internal void MarkNextSelectionAsUserInitiated()
+    {
+        _nextSelectionIsUserInitiated = true;
+    }
+
+    partial void OnIsCheckedChangedPartial(bool isProgrammatic);
+
+    partial void OnSelectedOptionChangedPartial(bool isProgrammatic);
 
     private static void OnIsCheckedChanged(BindableObject bindable, object oldValue, object newValue)
     {
@@ -123,11 +140,15 @@ public sealed class ToggleDropdown : ContentView
             return;
         }
 
-        toggleDropdown.Toggled?.Invoke(toggleDropdown, EventArgs.Empty);
+        var isProgrammatic = !toggleDropdown._nextToggleIsUserInitiated;
+        toggleDropdown._nextToggleIsUserInitiated = false;
+        toggleDropdown.Toggled?.Invoke(toggleDropdown, new ToggleDropdownToggleChangedEventArgs(isProgrammatic));
         if (isChecked)
         {
             toggleDropdown.Checked?.Invoke(toggleDropdown, EventArgs.Empty);
         }
+
+        toggleDropdown.OnIsCheckedChangedPartial(isProgrammatic);
     }
 
     private static void OnSelectedOptionChanged(BindableObject bindable, object oldValue, object newValue)
@@ -142,7 +163,30 @@ public sealed class ToggleDropdown : ContentView
             return;
         }
 
-        toggleDropdown.SelectionChanged?.Invoke(toggleDropdown, EventArgs.Empty);
+        var isProgrammatic = !toggleDropdown._nextSelectionIsUserInitiated;
+        toggleDropdown._nextSelectionIsUserInitiated = false;
+        toggleDropdown.SelectionChanged?.Invoke(toggleDropdown, new ToggleDropdownSelectionChangedEventArgs(isProgrammatic));
+        toggleDropdown.OnSelectedOptionChangedPartial(isProgrammatic);
     }
 
+}
+
+public sealed class ToggleDropdownToggleChangedEventArgs : EventArgs
+{
+    public ToggleDropdownToggleChangedEventArgs(bool isProgrammatic)
+    {
+        IsProgrammatic = isProgrammatic;
+    }
+
+    public bool IsProgrammatic { get; }
+}
+
+public sealed class ToggleDropdownSelectionChangedEventArgs : EventArgs
+{
+    public ToggleDropdownSelectionChangedEventArgs(bool isProgrammatic)
+    {
+        IsProgrammatic = isProgrammatic;
+    }
+
+    public bool IsProgrammatic { get; }
 }

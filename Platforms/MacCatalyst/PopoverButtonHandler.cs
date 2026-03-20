@@ -62,8 +62,16 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
         
         private void OnTapped()
         {
-            if (VirtualView is not PopoverButton popoverButton || popoverButton.PopoverContent == null)
+            if (VirtualView is not PopoverButton popoverButton)
                 return;
+
+            popoverButton.RaiseClicked();
+
+            var presentedContent = popoverButton.GetPresentedContent();
+            if (presentedContent == null)
+                return;
+
+            popoverButton.Flyout?.RaiseOpening();
 
             if (TryGetActivePopover(out var activePopover))
             {
@@ -71,7 +79,7 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
                 return;
             }
 
-            var popoverContent = popoverButton.PopoverContent;
+            var popoverContent = presentedContent;
             var mauiContext = MauiContext ?? throw new InvalidOperationException("MauiContext is null");
 
             var viewController = new UIViewController
@@ -103,10 +111,16 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
 
             var presentingController = GetPresentingViewController();
             presentingController?.PresentViewController(viewController, true, null);
+            popoverButton.Flyout?.RaiseOpened();
         }
 
         internal void CleanupPopover()
         {
+            if (VirtualView is PopoverButton popoverButton)
+            {
+                popoverButton.Flyout?.RaiseClosed();
+            }
+
             if (VirtualView is PopoverButton popoverButton && popoverButton.PopoverContent?.Handler is not null)
             {
                 popoverButton.PopoverContent.Handler.DisconnectHandler();
