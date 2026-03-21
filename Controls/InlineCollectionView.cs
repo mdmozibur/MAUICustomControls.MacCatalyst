@@ -71,7 +71,9 @@ public sealed class InlineCollectionView : HorizontalStackLayout
 			? new object[] { view.Children[currentIndex] }
 			: Array.Empty<object>();
 
-		view.SelectionChanged?.Invoke(view, new SelectionChangedEventArgs(previousSelection, currentSelection));
+		_ = previousSelection;
+		_ = currentSelection;
+		view.SelectionChanged?.Invoke(view, default!);
 	}
 
 	private void AttachTapRecognizer(View view)

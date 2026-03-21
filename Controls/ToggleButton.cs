@@ -3,6 +3,9 @@ namespace MAUICustomControls.MacCatalyst.Controls;
 public class ToggleButton : View
 {
     public event EventHandler? Toggled;
+    public event EventHandler? Checked;
+    public event EventHandler? Unchecked;
+    public event EventHandler<CheckedChangedEventArgs>? CheckedChanged;
 
     public static readonly BindableProperty IsCheckedProperty =
         BindableProperty.Create(nameof(IsChecked), typeof(bool), typeof(ToggleButton), false, BindingMode.TwoWay, propertyChanged: OnIsCheckedChanged);
@@ -12,6 +15,20 @@ public class ToggleButton : View
         get => (bool)GetValue(IsCheckedProperty);
         set => SetValue(IsCheckedProperty, value);
     }
+
+    public string? Name
+    {
+        get => AutomationId;
+        set => AutomationId = value;
+    }
+
+    public object? Content
+    {
+        get => GetValue(ContentProperty);
+        set => SetValue(ContentProperty, value);
+    }
+    public static readonly BindableProperty ContentProperty =
+        BindableProperty.Create(nameof(Content), typeof(object), typeof(ToggleButton), null);
 
     public static readonly BindableProperty TextProperty =
         BindableProperty.Create(nameof(Text), typeof(string), typeof(ToggleButton), string.Empty);
@@ -88,9 +105,19 @@ public class ToggleButton : View
 
     private static void OnIsCheckedChanged(BindableObject bindable, object oldValue, object newValue)
     {
-        if (bindable is not ToggleButton toggleButton || newValue is not bool)
+        if (bindable is not ToggleButton toggleButton || newValue is not bool isChecked)
         {
             return;
+        }
+
+        toggleButton.CheckedChanged?.Invoke(toggleButton, new CheckedChangedEventArgs(isChecked));
+        if (isChecked)
+        {
+            toggleButton.Checked?.Invoke(toggleButton, EventArgs.Empty);
+        }
+        else
+        {
+            toggleButton.Unchecked?.Invoke(toggleButton, EventArgs.Empty);
         }
 
         toggleButton.Toggled?.Invoke(toggleButton, EventArgs.Empty);

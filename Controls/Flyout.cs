@@ -131,6 +131,12 @@ public abstract class MenuFlyoutItemBase : BindableObject
         typeof(MenuFlyoutItemBase),
         null);
 
+    public static readonly BindableProperty IsEnabledProperty = BindableProperty.Create(
+        nameof(IsEnabled),
+        typeof(bool),
+        typeof(MenuFlyoutItemBase),
+        true);
+
     public static readonly BindableProperty StyleProperty = BindableProperty.Create(
         nameof(Style),
         typeof(Style),
@@ -163,6 +169,12 @@ public abstract class MenuFlyoutItemBase : BindableObject
     {
         get => (ICommand?)GetValue(CommandProperty);
         set => SetValue(CommandProperty, value);
+    }
+
+    public bool IsEnabled
+    {
+        get => (bool)GetValue(IsEnabledProperty);
+        set => SetValue(IsEnabledProperty, value);
     }
 
     public Style? Style
