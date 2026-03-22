@@ -34,6 +34,39 @@ public sealed class InlineCollectionView : HorizontalStackLayout
 		set => SetValue(SelectionModeProperty, value);
 	}
 
+	public object? SelectedItem
+	{
+		get
+		{
+			if (SelectedIndex < 0 || SelectedIndex >= Children.Count)
+			{
+				return null;
+			}
+
+			return Children[SelectedIndex];
+		}
+		set
+		{
+			if (value is null)
+			{
+				SelectedIndex = -1;
+				return;
+			}
+
+			for (var index = 0; index < Children.Count; index++)
+			{
+				var child = Children[index];
+				if (ReferenceEquals(child, value) || Equals(child, value))
+				{
+					SelectedIndex = index;
+					return;
+				}
+			}
+
+			SelectedIndex = -1;
+		}
+	}
+
 	public event EventHandler<SelectionChangedEventArgs>? SelectionChanged;
 
 	public InlineCollectionView()
