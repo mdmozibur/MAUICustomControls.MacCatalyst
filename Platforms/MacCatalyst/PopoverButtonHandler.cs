@@ -119,11 +119,11 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
             if (VirtualView is PopoverButton popoverButton)
             {
                 popoverButton.Flyout?.RaiseClosed();
-            }
 
-            if (VirtualView is PopoverButton popoverButton && popoverButton.PopoverContent?.Handler is not null)
-            {
-                popoverButton.PopoverContent.Handler.DisconnectHandler();
+                if (popoverButton.PopoverContent?.Handler is not null)
+                {
+                    popoverButton.PopoverContent.Handler.DisconnectHandler();
+                }
             }
 
             _popoverDelegate = null;

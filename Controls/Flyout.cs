@@ -188,7 +188,17 @@ public abstract class MenuFlyoutItemBase : BindableObject
 
 public class MenuFlyoutItem : MenuFlyoutItemBase
 {
-    public string? Text { get; set; }
+    public static readonly BindableProperty TextProperty = BindableProperty.Create(
+        nameof(Text),
+        typeof(string),
+        typeof(MenuFlyoutItem),
+        string.Empty);
+
+    public string? Text
+    {
+        get => (string?)GetValue(TextProperty);
+        set => SetValue(TextProperty, value);
+    }
 
     public object? Tag { get; set; }
 
@@ -289,7 +299,17 @@ public sealed class ToggleMenuFlyoutItem : MenuFlyoutItem
 [ContentProperty(nameof(Items))]
 public sealed class MenuFlyoutSubItem : MenuFlyoutItemBase
 {
-    public string? Text { get; set; }
+    public static readonly BindableProperty TextProperty = BindableProperty.Create(
+        nameof(Text),
+        typeof(string),
+        typeof(MenuFlyoutSubItem),
+        string.Empty);
+
+    public string? Text
+    {
+        get => (string?)GetValue(TextProperty);
+        set => SetValue(TextProperty, value);
+    }
 
     public ObservableCollection<MenuFlyoutItemBase> Items { get; } = [];
 

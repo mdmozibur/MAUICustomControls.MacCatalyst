@@ -128,7 +128,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
     private static void UpdateButtonContent(ToggleButtonPlatformView button, ToggleButton view)
     {
         var configuration = button.Configuration ?? UIButtonConfiguration.PlainButtonConfiguration;
-        var foregroundColor = view.Foreground.Color.ToPlatform();
+        var foregroundColor = ResolveForegroundColor(view);
 
         configuration.Title = view.Text;
         configuration.Image = CreateImage(view, foregroundColor);
@@ -146,7 +146,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
 
     private static void UpdateButtonAppearance(ToggleButtonPlatformView button, ToggleButton view)
     {
-        var foregroundColor = view.Foreground.Color.ToPlatform();
+        var foregroundColor = ResolveForegroundColor(view);
         var baseBackgroundColor = ResolveBackgroundColor(view);
 
         button.TintColor = foregroundColor;
@@ -190,22 +190,24 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
 
     private static UIColor ResolveBackgroundColor(ToggleButton view)
     {
-        if (view.Background is SolidColorBrush backgroundBrush)
-        {
-            return backgroundBrush.Color.ToPlatform();
-        }
-
-        return UIColor.Clear;
+        return ResolveBrushColor(view.Background as SolidColorBrush, UIColor.Clear);
     }
 
     private static UIColor ResolveBorderColor(ToggleButton view, UIColor fallbackColor)
     {
-        if (view.BorderBrush is SolidColorBrush borderBrush)
-        {
-            return borderBrush.Color.ToPlatform();
-        }
+        var defaultBorderColor = view.IsChecked ? fallbackColor.ColorWithAlpha(0.75f) : fallbackColor.ColorWithAlpha(0.35f);
+        return ResolveBrushColor(view.BorderBrush as SolidColorBrush, defaultBorderColor);
+    }
 
-        return view.IsChecked ? fallbackColor.ColorWithAlpha(0.75f) : fallbackColor.ColorWithAlpha(0.35f);
+    private static UIColor ResolveForegroundColor(ToggleButton view)
+    {
+        return ResolveBrushColor(view.Foreground, global::Microsoft.Maui.Graphics.Colors.DodgerBlue.ToPlatform());
+    }
+
+    private static UIColor ResolveBrushColor(SolidColorBrush? brush, UIColor fallbackColor)
+    {
+        var color = brush?.Color;
+        return color is null ? fallbackColor : color.ToPlatform();
     }
 
     public sealed class ToggleButtonPlatformView : UIButton

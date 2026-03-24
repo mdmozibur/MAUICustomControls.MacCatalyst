@@ -27,7 +27,7 @@ public sealed class PopoverButton : ContentView
 	}
 
 	public static readonly BindableProperty TextProperty =
-		BindableProperty.Create(nameof(Text), typeof(string), typeof(PopoverButton), null, propertyChanged: OnButtonFaceChanged);
+		BindableProperty.Create(nameof(Text), typeof(string), typeof(PopoverButton), string.Empty, propertyChanged: OnButtonFaceChanged);
 
 	public string? Text
 	{
