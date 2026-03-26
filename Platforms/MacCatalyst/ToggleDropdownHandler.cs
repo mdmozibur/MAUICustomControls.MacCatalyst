@@ -1,4 +1,6 @@
-
+using CoreGraphics;
+using CoreText;
+using Foundation;
 using Microsoft.Maui.Handlers;
 using Microsoft.Maui.Platform;
 using MAUICustomControls.MacCatalyst.Controls;
@@ -128,13 +130,13 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         }
 
         var selectedText = view.SelectedOption?.Text;
-        var config = UIImageSymbolConfiguration.Create(UIImageSymbolScale.Medium);
+        var tintColor = view.TintColor.ToPlatform();
         var menuItems = new UIAction[view.Options.Count];
 
         for (int i = 0; i < view.Options.Count; i++)
         {
             var option = view.Options[i];
-            var image = string.IsNullOrWhiteSpace(option.SystemIconName) ? null : UIImage.GetSystemImage(option.SystemIconName, config);
+            var image = CreateOptionImage(option, tintColor);
             var action = UIAction.Create(option.Text, image, null, optionChosen);
             action.State = string.Equals(option.Text, selectedText, StringComparison.Ordinal) ? UIMenuElementState.On : UIMenuElementState.Off;
             menuItems[i] = action;
@@ -148,7 +150,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         var tintColor = view.TintColor.ToPlatform();
         var configuration = button.Configuration ?? UIButtonConfiguration.PlainButtonConfiguration;
         var title = view.SelectedOption?.Text ?? view.UnselectedText;
-        var image = CreateSelectedImage(view.SelectedOption, tintColor);
+        var image = CreateOptionImage(view.SelectedOption, tintColor);
 
         configuration.Title = title;
         configuration.Image = image;
@@ -166,16 +168,79 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         button.BackgroundColor = view.IsChecked ? tintColor.ColorWithAlpha(0.14f) : UIColor.Clear;
     }
 
-    private static UIImage? CreateSelectedImage(Controls.CustomObjects.SelectorOption? selectedOption, UIColor tintColor)
+    private static UIImage? CreateOptionImage(Controls.CustomObjects.SelectorOption? selectedOption, UIColor tintColor)
     {
-        if (!selectedOption.HasValue || string.IsNullOrWhiteSpace(selectedOption.Value.SystemIconName))
+        if (!selectedOption.HasValue)
         {
             return null;
         }
 
-        var config = UIImageSymbolConfiguration.Create(UIImageSymbolScale.Medium);
-        var image = UIImage.GetSystemImage(selectedOption.Value.SystemIconName, config);
-        return image?.ApplyTintColor(tintColor, UIImageRenderingMode.AlwaysOriginal);
+        var option = selectedOption.Value;
+        if (!string.IsNullOrWhiteSpace(option.SystemIconName))
+        {
+            var config = UIImageSymbolConfiguration.Create(UIImageSymbolScale.Medium);
+            var image = UIImage.GetSystemImage(option.SystemIconName, config);
+            return image?.ApplyTintColor(tintColor, UIImageRenderingMode.AlwaysOriginal);
+        }
+
+        if (string.IsNullOrWhiteSpace(option.IconGlyph) || string.IsNullOrWhiteSpace(option.IconFontFamily))
+        {
+            return null;
+        }
+
+        return CreateFontGlyphImage(option.IconGlyph, option.IconFontFamily, option.IconFontSize, tintColor);
+    }
+
+    private static UIImage? CreateFontGlyphImage(string glyph, string fontFamily, double fontSize, UIColor tintColor)
+    {
+        var resolvedFontSize = (nfloat)Math.Max(fontSize > 0 ? fontSize : 16d, 8d);
+        var font = ResolvePlatformFont(fontFamily, resolvedFontSize) ?? UIFont.SystemFontOfSize(resolvedFontSize);
+        var attributes = new UIStringAttributes
+        {
+            Font = font,
+            ForegroundColor = tintColor,
+        };
+
+        using var glyphText = new NSString(glyph);
+        var textSize = glyphText.GetSizeUsingAttributes(attributes);
+        var width = (nfloat)Math.Ceiling(Math.Max(textSize.Width, resolvedFontSize));
+        var height = (nfloat)Math.Ceiling(Math.Max(textSize.Height, resolvedFontSize));
+        var imageSize = new CGSize(width, height);
+
+        UIGraphics.BeginImageContextWithOptions(imageSize, false, 0);
+        try
+        {
+            var drawPoint = new CGPoint(
+                Math.Max((width - textSize.Width) / 2f, 0f),
+                Math.Max((height - textSize.Height) / 2f, 0f));
+            glyphText.DrawString(drawPoint, attributes);
+            return UIGraphics.GetImageFromCurrentImageContext()?.ImageWithRenderingMode(UIImageRenderingMode.AlwaysOriginal);
+        }
+        finally
+        {
+            UIGraphics.EndImageContext();
+        }
+    }
+
+    private static UIFont? ResolvePlatformFont(string fontFamily, nfloat fontSize)
+    {
+        var font = UIFont.FromName(fontFamily, fontSize);
+        if (font is not null)
+        {
+            return font;
+        }
+
+        // MAUI-registered fonts may not yet be available via UIFont.FromName.
+        // Manually register the font from the app bundle as a fallback.
+        var bundlePath = NSBundle.MainBundle.PathForResource(fontFamily, "ttf");
+        if (bundlePath is not null)
+        {
+            var url = NSUrl.FromFilename(bundlePath);
+            CTFontManager.RegisterFontsForUrl(url, CTFontManagerScope.Process);
+            font = UIFont.FromName(fontFamily, fontSize);
+        }
+
+        return font;
     }
 
     private static UIControlContentHorizontalAlignment ResolveContentHorizontalAlignment(LayoutOptions alignment)

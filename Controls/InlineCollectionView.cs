@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Xaml;
 
@@ -6,6 +7,13 @@ namespace MAUICustomControls.MacCatalyst.Controls;
 [ContentProperty(nameof(Children))]
 public sealed class InlineCollectionView : HorizontalStackLayout
 {
+	private static readonly ConstructorInfo? SelectionChangedEventArgsConstructor =
+		typeof(SelectionChangedEventArgs).GetConstructor(
+			BindingFlags.Instance | BindingFlags.NonPublic,
+			binder: null,
+			new[] { typeof(object), typeof(object) },
+			modifiers: null);
+
 	public static readonly BindableProperty SelectedIndexProperty =
 		BindableProperty.Create(
 			nameof(SelectedIndex),
@@ -82,6 +90,25 @@ public sealed class InlineCollectionView : HorizontalStackLayout
 		{
 			AttachTapRecognizer(view);
 		}
+
+		if (child is RadioButton radioButton)
+		{
+			radioButton.CheckedChanged += OnRadioButtonCheckedChanged;
+		}
+	}
+
+	private void OnRadioButtonCheckedChanged(object? sender, CheckedChangedEventArgs e)
+	{
+		if (!e.Value || sender is not RadioButton radioButton)
+		{
+			return;
+		}
+
+		var index = GetChildIndex(radioButton);
+		if (index >= 0 && index != SelectedIndex)
+		{
+			SelectedIndex = index;
+		}
 	}
 
 	private static void OnSelectedIndexChanged(BindableObject bindable, object? oldValue, object? newValue)
@@ -98,15 +125,23 @@ public sealed class InlineCollectionView : HorizontalStackLayout
 		view.UpdateSelectedVisual(currentIndex, true);
 
 		var previousSelection = previousIndex >= 0 && previousIndex < view.Children.Count
-			? new object[] { view.Children[previousIndex] }
-			: Array.Empty<object>();
+			? view.Children[previousIndex]
+			: null;
 		var currentSelection = currentIndex >= 0 && currentIndex < view.Children.Count
-			? new object[] { view.Children[currentIndex] }
-			: Array.Empty<object>();
+			? view.Children[currentIndex]
+			: null;
 
-		_ = previousSelection;
-		_ = currentSelection;
-		view.SelectionChanged?.Invoke(view, default!);
+		view.SelectionChanged?.Invoke(view, CreateSelectionChangedEventArgs(previousSelection, currentSelection));
+	}
+
+	private static SelectionChangedEventArgs CreateSelectionChangedEventArgs(object? previousSelection, object? currentSelection)
+	{
+		if (SelectionChangedEventArgsConstructor is null)
+		{
+			throw new InvalidOperationException("Unable to create SelectionChangedEventArgs.");
+		}
+
+		return (SelectionChangedEventArgs)SelectionChangedEventArgsConstructor.Invoke(new[] { previousSelection, currentSelection });
 	}
 
 	private void AttachTapRecognizer(View view)
@@ -163,5 +198,10 @@ public sealed class InlineCollectionView : HorizontalStackLayout
 		}
 
 		child.Opacity = isSelected ? 1.0 : 0.92;
+
+		if (child is RadioButton radioButton)
+		{
+			radioButton.IsChecked = isSelected;
+		}
 	}
 }
