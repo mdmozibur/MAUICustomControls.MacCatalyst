@@ -71,8 +71,6 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
             if (presentedContent == null)
                 return;
 
-            popoverButton.Flyout?.RaiseOpening();
-
             if (TryGetActivePopover(out var activePopover))
             {
                 activePopover.DismissViewController(true, CleanupPopover);
@@ -111,15 +109,12 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
 
             var presentingController = GetPresentingViewController();
             presentingController?.PresentViewController(viewController, true, null);
-            popoverButton.Flyout?.RaiseOpened();
         }
 
         internal void CleanupPopover()
         {
             if (VirtualView is PopoverButton popoverButton)
             {
-                popoverButton.Flyout?.RaiseClosed();
-
                 if (popoverButton.PopoverContent?.Handler is not null)
                 {
                     popoverButton.PopoverContent.Handler.DisconnectHandler();

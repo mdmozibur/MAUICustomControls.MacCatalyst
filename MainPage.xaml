@@ -72,9 +72,18 @@
                     </x:Array>
                 </controls:ToggleDropdown.Options>
             </controls:ToggleDropdown>
+        
+            <controls:ToggleDropdown 
+                x:Name="DropdownBox2"
+                HorizontalOptions="Center" 
+                TintColor="DodgerBlue"
+                BorderThickness="1"
+                WidthRequest="200">
+            </controls:ToggleDropdown>
 
             <controls:CheckBox Text="Check me"
-                HorizontalOptions="Center" />
+                HorizontalOptions="Center"
+                CheckedChanged="CheckBox_CheckedChanged" />
 
             <VerticalStackLayout Spacing="14">
                 <Label Text="Switches"

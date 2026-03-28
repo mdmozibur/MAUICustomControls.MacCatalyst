@@ -17,15 +17,6 @@ public sealed class PopoverButton : ContentView
 		set => SetValue(PopoverContentProperty, value);
 	}
 
-	public static readonly BindableProperty FlyoutProperty =
-		BindableProperty.Create(nameof(Flyout), typeof(FlyoutBase), typeof(PopoverButton), null, propertyChanged: OnFlyoutChanged);
-
-	public FlyoutBase? Flyout
-	{
-		get => (FlyoutBase?)GetValue(FlyoutProperty);
-		set => SetValue(FlyoutProperty, value);
-	}
-
 	public static readonly BindableProperty TextProperty =
 		BindableProperty.Create(nameof(Text), typeof(string), typeof(PopoverButton), string.Empty, propertyChanged: OnButtonFaceChanged);
 
@@ -146,25 +137,12 @@ public sealed class PopoverButton : ContentView
 
 	internal View? GetPresentedContent()
 	{
-		return Flyout?.BuildView() ?? PopoverContent;
+		return PopoverContent;
 	}
 
 	internal void RaiseClicked()
 	{
 		Clicked?.Invoke(this, EventArgs.Empty);
-	}
-
-	private static void OnFlyoutChanged(BindableObject bindable, object? oldValue, object? newValue)
-	{
-		if (oldValue is FlyoutBase oldFlyout)
-		{
-			oldFlyout.AttachOwner(null);
-		}
-
-		if (bindable is PopoverButton button && newValue is FlyoutBase newFlyout)
-		{
-			newFlyout.AttachOwner(button);
-		}
 	}
 
 	private static void OnButtonFaceChanged(BindableObject bindable, object? oldValue, object? newValue)

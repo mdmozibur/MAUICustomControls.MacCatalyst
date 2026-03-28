@@ -1,4 +1,6 @@
-﻿namespace MAUICustomControls.MacCatalyst;
+﻿using MAUICustomControls.MacCatalyst.Controls.CustomObjects;
+
+namespace MAUICustomControls.MacCatalyst;
 
 public partial class MainPage : ContentPage
 {
@@ -12,4 +14,14 @@ public partial class MainPage : ContentPage
 	{
 		popoverButton.HidePopover();
     }
+
+    private void CheckBox_CheckedChanged(object sender, CheckedChangedEventArgs e)
+	{
+		DropdownBox2.Options = new List<SelectorOption>
+		{
+			new SelectorOption{ Text = "What", SystemIconName="star"},
+			new SelectorOption{ Text = "The", SystemIconName="star"},
+			new SelectorOption{ Text = "Fuck", SystemIconName="star"},
+		};
+	}
 }
