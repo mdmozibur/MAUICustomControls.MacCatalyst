@@ -58,7 +58,6 @@
         
             <controls:ToggleDropdown 
                 x:Name="DropdownBox"
-                UnselectedText="Select an option"
                 HorizontalOptions="Center" 
                 TintColor="DodgerBlue"
                 BorderThickness="1"

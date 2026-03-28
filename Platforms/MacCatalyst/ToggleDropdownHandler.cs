@@ -138,7 +138,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
     {
         var tintColor = view.TintColor.ToPlatform();
         var configuration = button.Configuration ?? UIButtonConfiguration.PlainButtonConfiguration;
-        var title = view.SelectedOption?.Text ?? view.UnselectedText;
+        var title = view.ChangeUnselectedTextOnSelectionChange ? (view.SelectedOption?.Text ?? view.UnselectedText) : view.UnselectedText;
         var image = CreateSelectedImage(view.SelectedOption, tintColor);
 
         configuration.Title = title;
