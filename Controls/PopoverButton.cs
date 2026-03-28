@@ -127,8 +127,16 @@ public sealed class PopoverButton : ContentView
 	}
 
 	public event EventHandler? Clicked;
+	public event EventHandler<object>? Opening;
+	public event EventHandler<object>? Opened;
+	public event EventHandler<object>? Closed;
 
 	internal Action? HidePopoverAction { get; set; }
+
+	public void Hide()
+	{
+		HidePopover();
+	}
 
 	public void HidePopover()
 	{
@@ -143,6 +151,21 @@ public sealed class PopoverButton : ContentView
 	internal void RaiseClicked()
 	{
 		Clicked?.Invoke(this, EventArgs.Empty);
+	}
+
+	internal void RaiseOpening()
+	{
+		Opening?.Invoke(this, EventArgs.Empty);
+	}
+
+	internal void RaiseOpened()
+	{
+		Opened?.Invoke(this, EventArgs.Empty);
+	}
+
+	internal void RaiseClosed()
+	{
+		Closed?.Invoke(this, EventArgs.Empty);
 	}
 
 	private static void OnButtonFaceChanged(BindableObject bindable, object? oldValue, object? newValue)

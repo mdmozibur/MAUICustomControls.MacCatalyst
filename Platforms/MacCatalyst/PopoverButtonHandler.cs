@@ -77,6 +77,8 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
                 return;
             }
 
+            popoverButton.RaiseOpening();
+
             var popoverContent = presentedContent;
             var mauiContext = MauiContext ?? throw new InvalidOperationException("MauiContext is null");
 
@@ -109,6 +111,7 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
 
             var presentingController = GetPresentingViewController();
             presentingController?.PresentViewController(viewController, true, null);
+            popoverButton.RaiseOpened();
         }
 
         internal void CleanupPopover()
@@ -119,6 +122,8 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
                 {
                     popoverButton.PopoverContent.Handler.DisconnectHandler();
                 }
+
+                popoverButton.RaiseClosed();
             }
 
             _popoverDelegate = null;
