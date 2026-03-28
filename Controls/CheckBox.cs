@@ -7,6 +7,14 @@ public sealed class CheckBox : ContentView
         BindableProperty.Create(nameof(IsChecked), typeof(bool), typeof(CheckBox), false, propertyChanged: OnIsCheckedChanged);
 
     public event EventHandler<CheckedChangedEventArgs>? CheckedChanged;
+    public event EventHandler? Checked;
+    public event EventHandler? Unchecked;
+
+    public string? Name
+    {
+        get => AutomationId;
+        set => AutomationId = value;
+    }
 
     public bool IsChecked
     {
@@ -56,5 +64,13 @@ public sealed class CheckBox : ContentView
         }
 
         checkBox.CheckedChanged?.Invoke(checkBox, new CheckedChangedEventArgs(isChecked));
+        if (isChecked)
+        {
+            checkBox.Checked?.Invoke(checkBox, EventArgs.Empty);
+        }
+        else
+        {
+            checkBox.Unchecked?.Invoke(checkBox, EventArgs.Empty);
+        }
     }
 }
