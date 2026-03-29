@@ -24,6 +24,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
         [nameof(ToggleButton.CustomFontFamily)] = MapImageSource,
         [nameof(ToggleButton.IsChecked)] = MapIsSelected,
         [nameof(ToggleButton.ImageSpacing)] = MapImageSpacing,
+        [nameof(ToggleButton.Orientation)] = MapOrientation,
     };
 
     public ToggleButtonHandler() : base(PropertyMapper) { }
@@ -128,6 +129,11 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
         UpdateButtonContent(handler.PlatformView, button);
     }
 
+    private static void MapOrientation(ToggleButtonHandler handler, ToggleButton button)
+    {
+        UpdateButtonContent(handler.PlatformView, button);
+    }
+
     private static void UpdateButtonContent(ToggleButtonPlatformView button, ToggleButton view)
     {
         var configuration = button.Configuration ?? UIButtonConfiguration.PlainButtonConfiguration;
@@ -135,7 +141,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
 
         configuration.Title = view.Text;
         configuration.Image = CreateImage(view, foregroundColor);
-        configuration.ImagePlacement = NSDirectionalRectEdge.Leading;
+        configuration.ImagePlacement = ResolveImagePlacement(view.Orientation);
         configuration.ImagePadding = (nfloat)Math.Max(0, view.ImageSpacing);
         configuration.BaseForegroundColor = foregroundColor;
         configuration.ContentInsets = ResolveContentInsets(view.Padding);
@@ -181,6 +187,13 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
             LayoutAlignment.Fill => UIControlContentHorizontalAlignment.Fill,
             _ => UIControlContentHorizontalAlignment.Center,
         };
+    }
+
+    private static NSDirectionalRectEdge ResolveImagePlacement(StackOrientation orientation)
+    {
+        return orientation == StackOrientation.Vertical
+            ? NSDirectionalRectEdge.Top
+            : NSDirectionalRectEdge.Leading;
     }
 
     private static UIImage? CreateImage(ToggleButton view, UIColor tintColor)

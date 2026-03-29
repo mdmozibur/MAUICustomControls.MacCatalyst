@@ -103,6 +103,14 @@ public class ToggleButton : View
     public static readonly BindableProperty ImageSpacingProperty =
         BindableProperty.Create(nameof(ImageSpacing), typeof(double), typeof(ToggleButton), 6.0);
 
+    public StackOrientation Orientation
+    {
+        get => (StackOrientation)GetValue(OrientationProperty);
+        set => SetValue(OrientationProperty, value);
+    }
+    public static readonly BindableProperty OrientationProperty =
+        BindableProperty.Create(nameof(Orientation), typeof(StackOrientation), typeof(ToggleButton), StackOrientation.Vertical);
+
     private static void OnIsCheckedChanged(BindableObject bindable, object oldValue, object newValue)
     {
         if (bindable is not ToggleButton toggleButton || newValue is not bool isChecked)
