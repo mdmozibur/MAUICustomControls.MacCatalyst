@@ -74,7 +74,13 @@ public sealed class CheckBoxHandler : ViewHandler<CheckBox, UIButton>
     
     public static void MapColor(CheckBoxHandler handler, CheckBox view)
     {
-        handler.PlatformView.SetTitleColor(handler.VirtualView.Foreground.Color.ToPlatform(), UIControlState.Normal);
+        handler.PlatformView.SetTitleColor(ResolveBrushColor(view.Foreground, global::Microsoft.Maui.Graphics.Colors.DodgerBlue.ToPlatform()), UIControlState.Normal);
+    }
+
+    private static UIColor ResolveBrushColor(global::Microsoft.Maui.Controls.SolidColorBrush? brush, UIColor fallbackColor)
+    {
+        var color = brush?.Color;
+        return color is null ? fallbackColor : color.ToPlatform();
     }
 
 }

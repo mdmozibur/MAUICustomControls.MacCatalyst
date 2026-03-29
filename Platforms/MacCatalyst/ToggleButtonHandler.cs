@@ -1,8 +1,10 @@
 using CoreAnimation;
 using CoreGraphics;
+using CoreText;
 using MAUICustomControls.MacCatalyst.Controls;
 using Microsoft.Maui.Handlers;
 using Microsoft.Maui.Platform;
+using Foundation;
 using UIKit;
 
 namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst;
@@ -19,6 +21,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
         [nameof(ToggleButton.BorderBrush)] = MapBorderBrush,
         [nameof(ToggleButton.Foreground)] = MapColor,
         [nameof(ToggleButton.IconGlyph)] = MapImageSource,
+        [nameof(ToggleButton.CustomFontFamily)] = MapImageSource,
         [nameof(ToggleButton.IsChecked)] = MapIsSelected,
         [nameof(ToggleButton.ImageSpacing)] = MapImageSpacing,
     };
@@ -140,7 +143,11 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
         button.Configuration = configuration;
         button.HorizontalAlignment = ResolveContentHorizontalAlignment(view.HorizontalContentAlignment);
         var currentFont = button.TitleLabel?.Font;
-        button.TitleLabel.Font = currentFont?.WithSize((nfloat)view.FontSize) ?? UIFont.SystemFontOfSize((nfloat)view.FontSize);
+        if (button.TitleLabel is not null)
+        {
+            button.TitleLabel.Font = currentFont?.WithSize((nfloat)view.FontSize) ?? UIFont.SystemFontOfSize((nfloat)view.FontSize);
+        }
+
         button.SetNeedsLayout();
     }
 
@@ -183,9 +190,57 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
             return null;
         }
 
+        if (!string.IsNullOrWhiteSpace(view.CustomFontFamily))
+        {
+            return CreateFontGlyphImage(view.IconGlyph, view.CustomFontFamily, view.FontSize, tintColor);
+        }
+
         var config = UIImageSymbolConfiguration.Create(UIImageSymbolScale.Medium);
         var image = UIImage.GetSystemImage(view.IconGlyph, config);
         return image?.ApplyTintColor(tintColor, UIImageRenderingMode.AlwaysOriginal);
+    }
+
+    private static UIImage? CreateFontGlyphImage(string glyph, string fontFamily, double fontSize, UIColor tintColor)
+    {
+        var resolvedFontSize = (nfloat)Math.Max(fontSize > 0 ? fontSize : 16d, 8d);
+        var font = ResolvePlatformFont(fontFamily, resolvedFontSize) ?? UIFont.SystemFontOfSize(resolvedFontSize);
+        var attributes = new UIStringAttributes
+        {
+            Font = font,
+            ForegroundColor = tintColor,
+        };
+
+        using var glyphText = new NSString(glyph);
+        var textSize = glyphText.GetSizeUsingAttributes(attributes);
+        var width = (nfloat)Math.Ceiling(Math.Max(textSize.Width, resolvedFontSize));
+        var height = (nfloat)Math.Ceiling(Math.Max(textSize.Height, resolvedFontSize));
+        var imageSize = new CGSize(width, height);
+
+        var drawPoint = new CGPoint(
+            Math.Max((width - textSize.Width) / 2f, 0f),
+            Math.Max((height - textSize.Height) / 2f, 0f));
+        var renderer = new UIGraphicsImageRenderer(imageSize);
+        var image = renderer.CreateImage(_ => glyphText.DrawString(drawPoint, attributes));
+        return image.ImageWithRenderingMode(UIImageRenderingMode.AlwaysOriginal);
+    }
+
+    private static UIFont? ResolvePlatformFont(string fontFamily, nfloat fontSize)
+    {
+        var font = UIFont.FromName(fontFamily, fontSize);
+        if (font is not null)
+        {
+            return font;
+        }
+
+        var bundlePath = NSBundle.MainBundle.PathForResource(fontFamily, "ttf");
+        if (bundlePath is not null)
+        {
+            var url = NSUrl.FromFilename(bundlePath);
+            CTFontManager.RegisterFontsForUrl(url, CTFontManagerScope.Process);
+            font = UIFont.FromName(fontFamily, fontSize);
+        }
+
+        return font;
     }
 
     private static UIColor ResolveBackgroundColor(ToggleButton view)

@@ -22,14 +22,6 @@ public class ToggleButton : View
         set => AutomationId = value;
     }
 
-    public object? Content
-    {
-        get => GetValue(ContentProperty);
-        set => SetValue(ContentProperty, value);
-    }
-    public static readonly BindableProperty ContentProperty =
-        BindableProperty.Create(nameof(Content), typeof(object), typeof(ToggleButton), null);
-
     public static readonly BindableProperty TextProperty =
         BindableProperty.Create(nameof(Text), typeof(string), typeof(ToggleButton), string.Empty);
 
@@ -86,6 +78,14 @@ public class ToggleButton : View
     }
     public static readonly BindableProperty IconGlyphProperty =
         BindableProperty.Create(nameof(IconGlyph), typeof(string), typeof(ToggleButton), string.Empty);
+
+    public string? CustomFontFamily
+    {
+        get => (string?)GetValue(CustomFontFamilyProperty);
+        set => SetValue(CustomFontFamilyProperty, value);
+    }
+    public static readonly BindableProperty CustomFontFamilyProperty =
+        BindableProperty.Create(nameof(CustomFontFamily), typeof(string), typeof(ToggleButton), null);
 
     public SolidColorBrush Foreground
     {

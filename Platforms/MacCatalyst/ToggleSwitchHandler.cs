@@ -97,12 +97,18 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
 
     public static void MapForeground(ToggleSwitchHandler handler, ToggleSwitch view)
     {
-        handler.PlatformView.TextLabel.TextColor = view.Foreground.Color.ToPlatform();
+        handler.PlatformView.TextLabel.TextColor = ResolveBrushColor(view.Foreground, Colors.Black.ToPlatform());
     }
 
     public static void MapOnColor(ToggleSwitchHandler handler, ToggleSwitch view)
     {
         handler.PlatformView.SwitchControl.OnTintColor = view.OnColor.ToPlatform();
+    }
+
+    private static UIColor ResolveBrushColor(global::Microsoft.Maui.Controls.SolidColorBrush? brush, UIColor fallbackColor)
+    {
+        var color = brush?.Color;
+        return color is null ? fallbackColor : color.ToPlatform();
     }
 
     public sealed class ToggleSwitchView : UIView
