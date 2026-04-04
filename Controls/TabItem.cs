@@ -64,11 +64,6 @@ public sealed class TabItem : TemplatedView
 
     public TabItem()
     {
-        if (Application.Current?.Resources.TryGetValue("TabItemControlTemplate", out var template) == true
-            && template is ControlTemplate ct)
-        {
-            ControlTemplate = ct;
-        }
     }
 
     protected override void OnApplyTemplate()

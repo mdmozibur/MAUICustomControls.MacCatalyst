@@ -81,11 +81,6 @@ public class CustomTabView : TemplatedView
 
     public CustomTabView()
     {
-        if (Application.Current?.Resources.TryGetValue("CustomTabViewControlTemplate", out var template) == true
-            && template is ControlTemplate ct)
-        {
-            ControlTemplate = ct;
-        }
         _items.CollectionChanged += Items_CollectionChanged;
     }
 
