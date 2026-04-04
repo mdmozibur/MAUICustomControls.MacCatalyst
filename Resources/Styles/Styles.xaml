@@ -449,4 +449,129 @@
         <Setter Property="SelectedTabColor" Value="{AppThemeBinding Light={StaticResource Gray950}, Dark={StaticResource Gray200}}" />
     </Style>
 
+    <Style TargetType="controls:TabItem" ApplyToDerivedTypes="True">
+        <Setter Property="ControlTemplate">
+            <ControlTemplate>
+                <Grid
+                    x:Name="RootGrid"
+                    MinimumWidthRequest="100"
+                    MaximumWidthRequest="360"
+                    MinimumHeightRequest="28"
+                    RowSpacing="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="2" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <BoxView 
+                        x:Name="SelectionHighlighter"
+                        Grid.Row="0"
+                        HorizontalOptions="Fill"
+                        VerticalOptions="Start" />
+
+                    <Grid Grid.Row="1" ColumnSpacing="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Label x:Name="TitleLabel"
+                            Grid.Column="0"
+                            FontSize="11"
+                            FontAttributes="Bold"
+                            LineBreakMode="NoWrap"
+                            VerticalOptions="Center"
+                            Text="{TemplateBinding Title}"
+                            Margin="8,0,0,0" />
+
+                        <Button 
+                            x:Name="CloseButton"
+                            Grid.Column="1"
+                            Text="&#x2715;"
+                            FontSize="14"
+                            Padding="4,4,4,4"
+                            BackgroundColor="Transparent"
+                            BorderWidth="0"
+                            MinimumWidthRequest="24"
+                            MinimumHeightRequest="24"
+                            IsVisible="False" />
+
+                        <BoxView 
+                            x:Name="Separator"
+                            Grid.Column="2"
+                            WidthRequest="1"
+                            HeightRequest="18"
+                            VerticalOptions="Center" />
+                    </Grid>
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <Style TargetType="controls:CustomTabView" ApplyToDerivedTypes="True">
+        <Setter Property="ControlTemplate" >
+            <ControlTemplate>
+                <Grid ColumnSpacing="0" HorizontalOptions="Fill" VerticalOptions="Fill">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button 
+                        x:Name="LeftScrollButton"
+                        Grid.Column="0"
+                        ImageSource="&#x25C0;"
+                        FontSize="12"
+                        Padding="4"
+                        Margin="0"
+                        BackgroundColor="Transparent"
+                        BorderWidth="0"
+                        MinimumWidthRequest="28"
+                        MinimumHeightRequest="28"
+                        IsVisible="False" />
+
+                    <ScrollView 
+                        x:Name="TabScrollView"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalScrollBarVisibility="Never"
+                        VerticalScrollBarVisibility="Never">
+                        <HorizontalStackLayout x:Name="TabHost" Spacing="0" />
+                    </ScrollView>
+
+                    <Button 
+                        x:Name="RightScrollButton"
+                        Grid.Column="2"
+                        Text="&#x25B6;"
+                        FontSize="12"
+                        Padding="4"
+                        Margin="0"
+                        BackgroundColor="Transparent"
+                        BorderWidth="0"
+                        MinimumWidthRequest="28"
+                        MinimumHeightRequest="28"
+                        IsVisible="False" />
+
+                    <Button 
+                        x:Name="AddButton"
+                        Grid.Column="3"
+                        Text="&#xFF0B;"
+                        FontSize="12"
+                        Padding="4"
+                        Margin="0"
+                        BackgroundColor="Transparent"
+                        BorderWidth="0"
+                        MinimumWidthRequest="28"
+                        MinimumHeightRequest="28" />
+                </Grid>
+            </ControlTemplate>
+
+        </Setter>
+        <Setter Property="HorizontalOptions" Value="Fill" />
+    </Style>
+
+
 </ResourceDictionary>

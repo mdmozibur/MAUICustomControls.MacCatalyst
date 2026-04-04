@@ -24,4 +24,9 @@ public partial class MainPage : ContentPage
 			new SelectorOption{ Text = "Fuck", SystemIconName="star"},
 		};
 	}
+
+    private void Button_Clicked1(object sender, EventArgs e)
+	{
+		TabsControl.Items.Add("Tab " + Random.Shared.Next(100));
+	}
 }

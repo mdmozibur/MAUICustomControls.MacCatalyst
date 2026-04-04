@@ -85,21 +85,29 @@
                 HorizontalOptions="Center"
                 CheckedChanged="CheckBox_CheckedChanged" />
 
-            <VerticalStackLayout Spacing="14">
-                <Label Text="Switches"
-                    FontSize="28"
-                    FontAttributes="Bold" />
+            <Label Text="Switches"
+                FontSize="28"
+                FontAttributes="Bold" />
 
-                <controls:ToggleSwitch Text="One"
-                    HorizontalOptions="Fill"
-                    IsOn="True"
-                    OnColor="DodgerBlue"
-                    Foreground="White" />
+            <controls:ToggleSwitch Text="One"
+                HorizontalOptions="Fill"
+                IsOn="True"
+                OnColor="DodgerBlue"
+                Foreground="White" />
 
-                <controls:ToggleSwitch Text="Two"
-                    HorizontalOptions="Fill"
-                    Foreground="White" />
-            </VerticalStackLayout>
+            <controls:ToggleSwitch Text="Two"
+                HorizontalOptions="Fill"
+                Foreground="White" />
+
+            <controls:CustomTabView
+                x:Name="TabsControl"
+                AddButtonVisibility="True"
+                ScrollButtonsVisibility="True">
+            </controls:CustomTabView>
+
+            <Button
+                Text="Add tab"
+                Clicked="Button_Clicked1"/>
 
         </VerticalStackLayout>
     </ScrollView>
