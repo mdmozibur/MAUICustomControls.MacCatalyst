@@ -1,17 +1,16 @@
 using System;
-using System.IO;
 using Microsoft.Maui.Controls;
-using Microsoft.Maui.Graphics;
 
 namespace MAUICustomControls.MacCatalyst.Controls;
 
 public sealed class TabItem : TemplatedView
 {
+    private const string NormalStateName = "Normal";
+    private const string PointerOverStateName = "PointerOver";
+    private const string SelectedStateName = "Selected";
+
     private Grid? _rootGrid;
-    private BoxView? _selectionHighlighter;
-    private Label? _titleLabel;
     private Button? _closeButton;
-    private BoxView? _separator;
     private bool _isPointerOver;
 
     internal event EventHandler? SelectionRequested;
@@ -79,10 +78,7 @@ public sealed class TabItem : TemplatedView
         if (_closeButton is not null) _closeButton.Clicked -= CloseButton_Clicked;
 
         _rootGrid = GetTemplateChild("RootGrid") as Grid;
-        _selectionHighlighter = GetTemplateChild("SelectionHighlighter") as BoxView;
-        _titleLabel = GetTemplateChild("TitleLabel") as Label;
         _closeButton = GetTemplateChild("CloseButton") as Button;
-        _separator = GetTemplateChild("Separator") as BoxView;
 
         if (_closeButton is not null) _closeButton.Clicked += CloseButton_Clicked;
 
@@ -130,42 +126,17 @@ public sealed class TabItem : TemplatedView
 
     private void UpdateVisualState()
     {
-        if (_rootGrid is not null)
-            _rootGrid.RowDefinitions[0].Height = new GridLength(SelectionBarHeight);
+        if (_rootGrid is null)
+            return;
 
-        if (_titleLabel is not null)
-        {
-            _titleLabel.Opacity = IsSelected ? 1 : _isPointerOver ? 0.85 : 0.7;
-        }
-
-        bool isDarkTheme = Application.Current?.RequestedTheme == AppTheme.Dark;
-
-        if (_selectionHighlighter is not null)
-            _selectionHighlighter.Color = GetSelectionColor();
-
-        if (_separator is not null)
-        {
-            _separator.Color = isDarkTheme
-                ? Color.FromRgba(255, 255, 255, 34)
-                : Color.FromRgba(0, 0, 0, 34);
-            _separator.IsVisible = !IsSelected;
-        }
-
-        if (_closeButton is not null)
-            _closeButton.IsVisible = IsClosable && (IsSelected || _isPointerOver);
-
-        if (_rootGrid is not null)
-        {
-            _rootGrid.BackgroundColor = IsSelected
-                ? (isDarkTheme ? Color.FromRgba(255, 255, 255, 34) : Color.FromRgba(0, 0, 0, 34))
-                : _isPointerOver
-                    ? (isDarkTheme ? Color.FromRgba(255, 255, 255, 21) : Color.FromRgba(0, 0, 0, 21))
-                    : Colors.Transparent;
-        }
+        VisualStateManager.GoToState(_rootGrid, GetVisualStateName());
     }
 
-    private Color GetSelectionColor()
+    private string GetVisualStateName()
     {
-        return IsSelected ? Colors.DodgerBlue : Colors.Transparent;
+        if (IsSelected)
+            return SelectedStateName;
+
+        return _isPointerOver ? PointerOverStateName : NormalStateName;
     }
 }

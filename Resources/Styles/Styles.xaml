@@ -459,20 +459,63 @@
                     MinimumHeightRequest="28"
                     RowSpacing="0">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="2" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
+
+                    <VisualStateManager.VisualStateGroups>
+                        <VisualStateGroupList>
+                            <VisualStateGroup Name="TabStates">
+                                <VisualState Name="Normal">
+                                    <VisualState.Setters>
+                                        <Setter Property="BackgroundColor" Value="Transparent" />
+                                        <Setter TargetName="SelectionHighlighter" Property="BoxView.Color" Value="Transparent" />
+                                        <Setter TargetName="TitleLabel" Property="VisualElement.Opacity" Value="0.7" />
+                                        <Setter TargetName="Separator" Property="VisualElement.IsVisible" Value="True" />
+                                        <Setter TargetName="CloseButtonColumn" Property="ColumnDefinition.Width" Value="0" />
+                                        <Setter TargetName="CloseButton" Property="VisualElement.Opacity" Value="0" />
+                                        <Setter TargetName="CloseButton" Property="VisualElement.IsEnabled" Value="False" />
+                                    </VisualState.Setters>
+                                </VisualState>
+
+                                <VisualState Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#15000000, Dark=#15FFFFFF}" />
+                                        <Setter TargetName="SelectionHighlighter" Property="BoxView.Color" Value="Transparent" />
+                                        <Setter TargetName="TitleLabel" Property="VisualElement.Opacity" Value="0.85" />
+                                        <Setter TargetName="Separator" Property="VisualElement.IsVisible" Value="True" />
+                                        <Setter TargetName="CloseButtonColumn" Property="ColumnDefinition.Width" Value="Auto" />
+                                        <Setter TargetName="CloseButton" Property="VisualElement.Opacity" Value="1" />
+                                        <Setter TargetName="CloseButton" Property="VisualElement.IsEnabled" Value="True" />
+                                    </VisualState.Setters>
+                                </VisualState>
+
+                                <VisualState Name="Selected">
+                                    <VisualState.Setters>
+                                        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#22000000, Dark=#22FFFFFF}" />
+                                        <Setter TargetName="SelectionHighlighter" Property="BoxView.Color" Value="DodgerBlue" />
+                                        <Setter TargetName="TitleLabel" Property="VisualElement.Opacity" Value="1" />
+                                        <Setter TargetName="Separator" Property="VisualElement.IsVisible" Value="False" />
+                                        <Setter TargetName="CloseButtonColumn" Property="ColumnDefinition.Width" Value="Auto" />
+                                        <Setter TargetName="CloseButton" Property="VisualElement.Opacity" Value="1" />
+                                        <Setter TargetName="CloseButton" Property="VisualElement.IsEnabled" Value="True" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateGroupList>
+                    </VisualStateManager.VisualStateGroups>
 
                     <BoxView 
                         x:Name="SelectionHighlighter"
                         Grid.Row="0"
+                        HeightRequest="{TemplateBinding SelectionBarHeight}"
                         HorizontalOptions="Fill"
                         VerticalOptions="Start" />
 
                     <Grid Grid.Row="1" ColumnSpacing="0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition x:Name="CloseButtonColumn" Width="0" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
@@ -495,14 +538,16 @@
                             BorderWidth="0"
                             MinimumWidthRequest="24"
                             MinimumHeightRequest="24"
-                            IsVisible="False" />
+                            IsVisible="{TemplateBinding IsClosable}"
+                            Opacity="0" />
 
                         <BoxView 
                             x:Name="Separator"
                             Grid.Column="2"
                             WidthRequest="1"
                             HeightRequest="18"
-                            VerticalOptions="Center" />
+                            VerticalOptions="Center"
+                            Color="{AppThemeBinding Light=#22000000, Dark=#22FFFFFF}" />
                     </Grid>
                 </Grid>
             </ControlTemplate>
@@ -512,7 +557,7 @@
     <Style TargetType="controls:CustomTabView" ApplyToDerivedTypes="True">
         <Setter Property="ControlTemplate" >
             <ControlTemplate>
-                <Grid ColumnSpacing="0" HorizontalOptions="Fill" VerticalOptions="Fill">
+                <Grid x:Name="TabViewChromeRoot" ColumnSpacing="0" HorizontalOptions="Fill" VerticalOptions="Fill">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -520,18 +565,81 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
+                    <VisualStateManager.VisualStateGroups>
+                        <VisualStateGroupList>
+                            <VisualStateGroup Name="AddButtonStates">
+                                <VisualState Name="Normal" />
+                                <VisualState Name="AddButtonVisible">
+                                    <VisualState.Setters>
+                                        <Setter TargetName="AddButton" Property="VisualElement.IsVisible" Value="True" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState Name="AddButtonHidden">
+                                    <VisualState.Setters>
+                                        <Setter TargetName="AddButton" Property="VisualElement.IsVisible" Value="False" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+
+                            <VisualStateGroup Name="ScrollButtonsVisibilityStates">
+                                <VisualState Name="Normal" />
+                                <VisualState Name="ScrollButtonsVisible">
+                                    <VisualState.Setters>
+                                        <Setter TargetName="LeftScrollButton" Property="VisualElement.IsVisible" Value="True" />
+                                        <Setter TargetName="RightScrollButton" Property="VisualElement.IsVisible" Value="True" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState Name="ScrollButtonsHidden">
+                                    <VisualState.Setters>
+                                        <Setter TargetName="LeftScrollButton" Property="VisualElement.IsVisible" Value="False" />
+                                        <Setter TargetName="RightScrollButton" Property="VisualElement.IsVisible" Value="False" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+
+                            <VisualStateGroup Name="ScrollButtonsAvailabilityStates">
+                                <VisualState Name="Normal" />
+                                <VisualState Name="ScrollButtonsInactive">
+                                    <VisualState.Setters>
+                                        <Setter TargetName="LeftScrollButton" Property="VisualElement.IsEnabled" Value="False" />
+                                        <Setter TargetName="RightScrollButton" Property="VisualElement.IsEnabled" Value="False" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState Name="ScrollButtonsAtStart">
+                                    <VisualState.Setters>
+                                        <Setter TargetName="LeftScrollButton" Property="VisualElement.IsEnabled" Value="False" />
+                                        <Setter TargetName="RightScrollButton" Property="VisualElement.IsEnabled" Value="True" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState Name="ScrollButtonsInMiddle">
+                                    <VisualState.Setters>
+                                        <Setter TargetName="LeftScrollButton" Property="VisualElement.IsEnabled" Value="True" />
+                                        <Setter TargetName="RightScrollButton" Property="VisualElement.IsEnabled" Value="True" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState Name="ScrollButtonsAtEnd">
+                                    <VisualState.Setters>
+                                        <Setter TargetName="LeftScrollButton" Property="VisualElement.IsEnabled" Value="True" />
+                                        <Setter TargetName="RightScrollButton" Property="VisualElement.IsEnabled" Value="False" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateGroupList>
+                    </VisualStateManager.VisualStateGroups>
+
                     <Button 
                         x:Name="LeftScrollButton"
                         Grid.Column="0"
                         ImageSource="&#x25C0;"
                         FontSize="12"
-                        Padding="4"
+                        Padding="{TemplateBinding ButtonsPadding}"
                         Margin="0"
                         BackgroundColor="Transparent"
                         BorderWidth="0"
                         MinimumWidthRequest="28"
                         MinimumHeightRequest="28"
-                        IsVisible="False" />
+                        IsVisible="False"
+                        IsEnabled="False" />
 
                     <ScrollView 
                         x:Name="TabScrollView"
@@ -547,20 +655,21 @@
                         Grid.Column="2"
                         Text="&#x25B6;"
                         FontSize="12"
-                        Padding="4"
+                        Padding="{TemplateBinding ButtonsPadding}"
                         Margin="0"
                         BackgroundColor="Transparent"
                         BorderWidth="0"
                         MinimumWidthRequest="28"
                         MinimumHeightRequest="28"
-                        IsVisible="False" />
+                        IsVisible="False"
+                        IsEnabled="False" />
 
                     <Button 
                         x:Name="AddButton"
                         Grid.Column="3"
                         Text="&#xFF0B;"
                         FontSize="12"
-                        Padding="4"
+                        Padding="{TemplateBinding ButtonsPadding}"
                         Margin="0"
                         BackgroundColor="Transparent"
                         BorderWidth="0"
