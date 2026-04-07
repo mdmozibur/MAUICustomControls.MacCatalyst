@@ -140,10 +140,7 @@ public class CustomTabView : TemplatedView
 
     protected virtual TabItem CreateTabItem()
     {
-        return new TabItem
-        {
-            Title = "Custom Title"
-        };
+        return new TabItem();
     }
 
     protected virtual void ConfigureTabItem(TabItem tabItem, object item)
