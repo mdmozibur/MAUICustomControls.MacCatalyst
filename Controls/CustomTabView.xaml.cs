@@ -8,7 +8,7 @@ using Microsoft.Maui.Controls;
 
 namespace MAUICustomControls.MacCatalyst.Controls;
 
-public class CustomTabView : TemplatedView
+public partial class CustomTabView : Grid
 {
     private const double WidthPerScroll = 100;
     private const string AddButtonVisibleStateName = "AddButtonVisible";
@@ -28,12 +28,6 @@ public class CustomTabView : TemplatedView
             modifiers: null);
 
     private readonly ObservableCollection<object> _items = new();
-    private Grid? _chromeRoot;
-    private Button? _leftScrollButton;
-    private Button? _rightScrollButton;
-    private Button? _addButton;
-    private ScrollView? _scrollView;
-    private HorizontalStackLayout? _tabHost;
 
     public event EventHandler<EventArgs>? AddButtonClick;
 
@@ -81,41 +75,17 @@ public class CustomTabView : TemplatedView
 
     public CustomTabView()
     {
+        InitializeComponent();
+
         _items.CollectionChanged += Items_CollectionChanged;
-    }
 
-    protected override void OnApplyTemplate()
-    {
-        base.OnApplyTemplate();
+        LeftScrollButton.Clicked += LeftScrollButton_Click;
+        RightScrollButton.Clicked += RightScrollButton_Click;
+        AddButton.Clicked += AddButton_Click;
+        TabScrollView.SizeChanged += ScrollView_SizeChanged;
+        TabScrollView.Scrolled += ScrollView_Scrolled;
+        TabHost.SizeChanged += TabHost_SizeChanged;
 
-        if (_leftScrollButton is not null) _leftScrollButton.Clicked -= LeftScrollButton_Click;
-        if (_rightScrollButton is not null) _rightScrollButton.Clicked -= RightScrollButton_Click;
-        if (_addButton is not null) _addButton.Clicked -= AddButton_Click;
-        if (_scrollView is not null)
-        {
-            _scrollView.SizeChanged -= ScrollView_SizeChanged;
-            _scrollView.Scrolled -= ScrollView_Scrolled;
-        }
-        if (_tabHost is not null) _tabHost.SizeChanged -= TabHost_SizeChanged;
-
-        _chromeRoot = GetTemplateChild("TabViewChromeRoot") as Grid;
-        _leftScrollButton = GetTemplateChild("LeftScrollButton") as Button;
-        _rightScrollButton = GetTemplateChild("RightScrollButton") as Button;
-        _addButton = GetTemplateChild("AddButton") as Button;
-        _scrollView = GetTemplateChild("TabScrollView") as ScrollView;
-        _tabHost = GetTemplateChild("TabHost") as HorizontalStackLayout;
-
-        if (_leftScrollButton is not null) _leftScrollButton.Clicked += LeftScrollButton_Click;
-        if (_rightScrollButton is not null) _rightScrollButton.Clicked += RightScrollButton_Click;
-        if (_addButton is not null) _addButton.Clicked += AddButton_Click;
-        if (_scrollView is not null)
-        {
-            _scrollView.SizeChanged += ScrollView_SizeChanged;
-            _scrollView.Scrolled += ScrollView_Scrolled;
-        }
-        if (_tabHost is not null) _tabHost.SizeChanged += TabHost_SizeChanged;
-
-        RebuildTabs();
         UpdateVisualStates();
     }
 
@@ -174,25 +144,23 @@ public class CustomTabView : TemplatedView
             return;
 
         var args = e!;
-        if (_tabHost is not HorizontalStackLayout tabHost)
-            return;
 
         switch (args.Action)
         {
             case NotifyCollectionChangedAction.Add:
-                InsertTabs(tabHost, args.NewStartingIndex, args.NewItems!);
+                InsertTabs(TabHost, args.NewStartingIndex, args.NewItems!);
                 break;
             case NotifyCollectionChangedAction.Remove:
-                RemoveTabs(tabHost, args.OldStartingIndex, args.OldItems!.Count);
+                RemoveTabs(TabHost, args.OldStartingIndex, args.OldItems!.Count);
                 break;
             case NotifyCollectionChangedAction.Replace:
-                RemoveTabs(tabHost, args.OldStartingIndex, args.OldItems!.Count);
-                InsertTabs(tabHost, args.NewStartingIndex, args.NewItems!);
+                RemoveTabs(TabHost, args.OldStartingIndex, args.OldItems!.Count);
+                InsertTabs(TabHost, args.NewStartingIndex, args.NewItems!);
                 break;
             case NotifyCollectionChangedAction.Move:
-                var movedTab = tabHost.Children[args.OldStartingIndex];
-                tabHost.Children.RemoveAt(args.OldStartingIndex);
-                tabHost.Children.Insert(args.NewStartingIndex, movedTab);
+                var movedTab = TabHost.Children[args.OldStartingIndex];
+                TabHost.Children.RemoveAt(args.OldStartingIndex);
+                TabHost.Children.Insert(args.NewStartingIndex, movedTab);
                 break;
             default: // Reset
                 RebuildTabs();
@@ -245,27 +213,26 @@ public class CustomTabView : TemplatedView
 
     private async void ScrollSelectedTabIntoView()
     {
-        if (SelectedItem is null || _tabHost is null || _scrollView is null)
+        if (SelectedItem is null)
             return;
 
-        foreach (var child in _tabHost.Children.OfType<TabItem>())
+        foreach (var child in TabHost.Children.OfType<TabItem>())
         {
             if (Equals(child.BindingContext, SelectedItem))
             {
-                // Give layout a frame to settle
                 await Task.Yield();
                 var targetX = child.X;
                 var tabWidth = child.Width;
-                var viewportWidth = _scrollView.Width;
-                var scrollX = _scrollView.ScrollX;
+                var viewportWidth = TabScrollView.Width;
+                var scrollX = TabScrollView.ScrollX;
 
                 if (targetX < scrollX)
                 {
-                    await _scrollView.ScrollToAsync(targetX, 0, true);
+                    await TabScrollView.ScrollToAsync(targetX, 0, true);
                 }
                 else if (targetX + tabWidth > scrollX + viewportWidth)
                 {
-                    await _scrollView.ScrollToAsync(targetX + tabWidth - viewportWidth, 0, true);
+                    await TabScrollView.ScrollToAsync(targetX + tabWidth - viewportWidth, 0, true);
                 }
                 break;
             }
@@ -274,22 +241,20 @@ public class CustomTabView : TemplatedView
 
     private void RebuildTabs()
     {
-        if (_tabHost is null) return;
-
-        foreach (var existingTab in _tabHost.Children.OfType<TabItem>().ToArray())
+        foreach (var existingTab in TabHost.Children.OfType<TabItem>().ToArray())
         {
             existingTab.SelectionRequested -= TabItem_SelectionRequested;
             existingTab.CloseRequested -= TabItem_CloseRequested;
         }
 
-        _tabHost.Children.Clear();
+        TabHost.Children.Clear();
         foreach (var item in _items)
         {
             var tabItem = CreateTabItem();
             ConfigureTabItem(tabItem, item);
             tabItem.SelectionRequested += TabItem_SelectionRequested;
             tabItem.CloseRequested += TabItem_CloseRequested;
-            _tabHost.Children.Add(tabItem);
+            TabHost.Children.Add(tabItem);
         }
 
         UpdateTabSelectionStates();
@@ -298,8 +263,7 @@ public class CustomTabView : TemplatedView
 
     private void UpdateTabSelectionStates()
     {
-        if (_tabHost is null) return;
-        foreach (var tabItem in _tabHost.Children.OfType<TabItem>())
+        foreach (var tabItem in TabHost.Children.OfType<TabItem>())
         {
             tabItem.IsSelected = Equals(tabItem.BindingContext, SelectedItem);
         }
@@ -307,12 +271,9 @@ public class CustomTabView : TemplatedView
 
     private void UpdateVisualStates()
     {
-        if (_chromeRoot is null)
-            return;
-
-        VisualStateManager.GoToState(_chromeRoot, GetAddButtonStateName());
-        VisualStateManager.GoToState(_chromeRoot, GetScrollButtonsVisibilityStateName());
-        VisualStateManager.GoToState(_chromeRoot, GetScrollButtonsAvailabilityStateName());
+        VisualStateManager.GoToState(TabViewChromeRoot, GetAddButtonStateName());
+        VisualStateManager.GoToState(TabViewChromeRoot, GetScrollButtonsVisibilityStateName());
+        VisualStateManager.GoToState(TabViewChromeRoot, GetScrollButtonsAvailabilityStateName());
     }
 
     private string GetAddButtonStateName()
@@ -327,11 +288,11 @@ public class CustomTabView : TemplatedView
 
     private string GetScrollButtonsAvailabilityStateName()
     {
-        if (!CanShowScrollButtons() || _scrollView is null)
+        if (!CanShowScrollButtons())
             return ScrollButtonsInactiveStateName;
 
-        bool canScrollLeft = _scrollView.ScrollX > 0;
-        bool canScrollRight = _tabHost is not null && _scrollView.ScrollX + _scrollView.Width < _tabHost.Width - 1;
+        bool canScrollLeft = TabScrollView.ScrollX > 0;
+        bool canScrollRight = TabScrollView.ScrollX + TabScrollView.Width < TabHost.Width - 1;
 
         if (canScrollLeft && canScrollRight)
             return ScrollButtonsInMiddleStateName;
@@ -347,10 +308,8 @@ public class CustomTabView : TemplatedView
 
     private bool CanShowScrollButtons()
     {
-        return _tabHost is not null
-            && _scrollView is not null
-            && ScrollButtonsVisibility
-            && _tabHost.Width > _scrollView.Width + 1;
+        return ScrollButtonsVisibility
+            && TabHost.Width > TabScrollView.Width + 1;
     }
 
     private void TabItem_SelectionRequested(object? sender, EventArgs e)
@@ -371,16 +330,14 @@ public class CustomTabView : TemplatedView
 
     private async void LeftScrollButton_Click(object? sender, EventArgs e)
     {
-        if (_scrollView is null) return;
-        await _scrollView.ScrollToAsync(Math.Max(0, _scrollView.ScrollX - WidthPerScroll), 0, true);
+        await TabScrollView.ScrollToAsync(Math.Max(0, TabScrollView.ScrollX - WidthPerScroll), 0, true);
         UpdateVisualStates();
     }
 
     private async void RightScrollButton_Click(object? sender, EventArgs e)
     {
-        if (_scrollView is null || _tabHost is null) return;
-        var maxOffset = Math.Max(0, _tabHost.Width - _scrollView.Width);
-        await _scrollView.ScrollToAsync(Math.Min(maxOffset, _scrollView.ScrollX + WidthPerScroll), 0, true);
+        var maxOffset = Math.Max(0, TabHost.Width - TabScrollView.Width);
+        await TabScrollView.ScrollToAsync(Math.Min(maxOffset, TabScrollView.ScrollX + WidthPerScroll), 0, true);
         UpdateVisualStates();
     }
 

@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<?xaml-comp compile="true" ?>
+
+    <Grid  
+    x:Class="MAUICustomControls.MacCatalyst.Controls.CustomTabView"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+         x:Name="TabViewChromeRoot" ColumnSpacing="0" HorizontalOptions="Fill" VerticalOptions="Fill">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroupList>
+                <VisualStateGroup Name="AddButtonStates">
+                    <VisualState Name="Normal" />
+                    <VisualState Name="AddButtonVisible">
+                        <VisualState.Setters>
+                            <Setter TargetName="AddButton" Property="VisualElement.IsVisible" Value="True" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState Name="AddButtonHidden">
+                        <VisualState.Setters>
+                            <Setter TargetName="AddButton" Property="VisualElement.IsVisible" Value="False" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+
+                <VisualStateGroup Name="ScrollButtonsVisibilityStates">
+                    <VisualState Name="Normal" />
+                    <VisualState Name="ScrollButtonsVisible">
+                        <VisualState.Setters>
+                            <Setter TargetName="LeftScrollButton" Property="VisualElement.IsVisible" Value="True" />
+                            <Setter TargetName="RightScrollButton" Property="VisualElement.IsVisible" Value="True" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState Name="ScrollButtonsHidden">
+                        <VisualState.Setters>
+                            <Setter TargetName="LeftScrollButton" Property="VisualElement.IsVisible" Value="False" />
+                            <Setter TargetName="RightScrollButton" Property="VisualElement.IsVisible" Value="False" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+
+                <VisualStateGroup Name="ScrollButtonsAvailabilityStates">
+                    <VisualState Name="Normal" />
+                    <VisualState Name="ScrollButtonsInactive">
+                        <VisualState.Setters>
+                            <Setter TargetName="LeftScrollButton" Property="VisualElement.IsEnabled" Value="False" />
+                            <Setter TargetName="RightScrollButton" Property="VisualElement.IsEnabled" Value="False" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState Name="ScrollButtonsAtStart">
+                        <VisualState.Setters>
+                            <Setter TargetName="LeftScrollButton" Property="VisualElement.IsEnabled" Value="False" />
+                            <Setter TargetName="RightScrollButton" Property="VisualElement.IsEnabled" Value="True" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState Name="ScrollButtonsInMiddle">
+                        <VisualState.Setters>
+                            <Setter TargetName="LeftScrollButton" Property="VisualElement.IsEnabled" Value="True" />
+                            <Setter TargetName="RightScrollButton" Property="VisualElement.IsEnabled" Value="True" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState Name="ScrollButtonsAtEnd">
+                        <VisualState.Setters>
+                            <Setter TargetName="LeftScrollButton" Property="VisualElement.IsEnabled" Value="True" />
+                            <Setter TargetName="RightScrollButton" Property="VisualElement.IsEnabled" Value="False" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </VisualStateManager.VisualStateGroups>
+
+        <Button
+            x:Name="LeftScrollButton"
+            Grid.Column="0"
+            Text="&#x25C0;"
+            FontSize="12"
+            Padding="{Binding Source={x:Reference TabViewChromeRoot}, Path=ButtonsPadding}"
+            Margin="0"
+            BackgroundColor="Transparent"
+            BorderWidth="0"
+            MinimumWidthRequest="28"
+            MinimumHeightRequest="28"
+            IsVisible="False"
+            IsEnabled="False" />
+
+        <ScrollView
+            x:Name="TabScrollView"
+            Grid.Column="1"
+            Orientation="Horizontal"
+            Padding="0,-40,0,0"
+            HorizontalScrollBarVisibility="Never"
+            VerticalScrollBarVisibility="Never">
+            <HorizontalStackLayout x:Name="TabHost" Spacing="0" />
+        </ScrollView>
+
+        <Button
+            x:Name="RightScrollButton"
+            Grid.Column="2"
+            Text="&#x25B6;"
+            FontSize="12"
+            Padding="{Binding Source={x:Reference TabViewChromeRoot}, Path=ButtonsPadding}"
+            Margin="0"
+            BackgroundColor="Transparent"
+            BorderWidth="0"
+            MinimumWidthRequest="28"
+            MinimumHeightRequest="28"
+            IsVisible="False"
+            IsEnabled="False" />
+
+        <Button
+            x:Name="AddButton"
+            Grid.Column="3"
+            Text="&#xFF0B;"
+            FontSize="12"
+            Padding="{Binding Source={x:Reference TabViewChromeRoot}, Path=ButtonsPadding}"
+            Margin="0"
+            BackgroundColor="Transparent"
+            BorderWidth="0"
+            MinimumWidthRequest="28"
+            MinimumHeightRequest="28" />
+    </Grid>
