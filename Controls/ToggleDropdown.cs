@@ -63,6 +63,22 @@ public sealed partial class ToggleDropdown : ContentView
     public static readonly BindableProperty SpacingProperty =
         BindableProperty.Create(nameof(Spacing), typeof(double), typeof(ToggleDropdown), 2.0);
 
+    public double FontSize
+    {
+        get => (double)GetValue(FontSizeProperty);
+        set => SetValue(FontSizeProperty, value);
+    }
+    public static readonly BindableProperty FontSizeProperty =
+        BindableProperty.Create(nameof(FontSize), typeof(double), typeof(ToggleDropdown), 12.0);
+
+    public StackOrientation Orientation
+    {
+        get => (StackOrientation)GetValue(OrientationProperty);
+        set => SetValue(OrientationProperty, value);
+    }
+    public static readonly BindableProperty OrientationProperty =
+        BindableProperty.Create(nameof(Orientation), typeof(StackOrientation), typeof(ToggleDropdown), StackOrientation.Vertical);
+
     public double IconFontSize
     {
         get => (double)GetValue(IconFontSizeProperty);
