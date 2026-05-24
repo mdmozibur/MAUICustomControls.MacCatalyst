@@ -1,4 +1,4 @@
-using CoreAnimation;
+
 using CoreGraphics;
 using CoreText;
 using MAUICustomControls.MacCatalyst.Controls;
@@ -9,7 +9,7 @@ using UIKit;
 
 namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst;
 
-public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButtonHandler.ToggleButtonPlatformView>
+public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
 {
     public static PropertyMapper<ToggleButton, ToggleButtonHandler> PropertyMapper = new(ViewMapper)
     {
@@ -29,7 +29,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
 
     public ToggleButtonHandler() : base(PropertyMapper) { }
 
-    protected override void ConnectHandler(ToggleButtonPlatformView platformView)
+    protected override void ConnectHandler(UIButton platformView)
     {
         base.ConnectHandler(platformView);
 
@@ -40,24 +40,24 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
         UpdateButtonAppearance(platformView, VirtualView);
     }
 
-    private void ConfigureButton(ToggleButtonPlatformView button)
+    private void ConfigureButton(UIButton button)
     {
         button.ChangesSelectionAsPrimaryAction = true;
         button.Configuration = UIButtonConfiguration.PlainButtonConfiguration;
         button.ClipsToBounds = true;
         button.Layer.MasksToBounds = true;
-        button.Layer.CornerRadius = 14;
-        button.TitleLabel.LineBreakMode = UILineBreakMode.TailTruncation;
+        button.Layer.CornerRadius = 0;
+        button.TitleLabel.LineBreakMode = UILineBreakMode.WordWrap;
     }
 
-    protected override ToggleButtonPlatformView CreatePlatformView()
+    protected override UIButton CreatePlatformView()
     {
-        var button = new ToggleButtonPlatformView();
+        var button = new UIButton();
         button.ChangesSelectionAsPrimaryAction = true;
         return button;
     }
 
-    protected override void DisconnectHandler(ToggleButtonPlatformView platformView)
+    protected override void DisconnectHandler(UIButton platformView)
     {
         platformView.RemoveTarget(ButtonTapped, UIControlEvent.TouchUpInside);
         base.DisconnectHandler(platformView);
@@ -134,36 +134,53 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
         UpdateButtonContent(handler.PlatformView, button);
     }
 
-    private static void UpdateButtonContent(ToggleButtonPlatformView button, ToggleButton view)
+    private static void UpdateButtonContent(UIButton button, ToggleButton view)
     {
         var configuration = button.Configuration ?? UIButtonConfiguration.PlainButtonConfiguration;
         var foregroundColor = ResolveForegroundColor(view);
 
+        var hasIcon = !string.IsNullOrWhiteSpace(view.IconGlyph);
+        var titleFontSize = (nfloat)Math.Max(hasIcon ? Math.Min(view.FontSize * 0.75, 13.0) : view.FontSize, 8d);
+        var titleFont = UIFont.SystemFontOfSize(titleFontSize);
+
+        var image = CreateImage(view, foregroundColor);
         configuration.Title = view.Text;
-        configuration.Image = CreateImage(view, foregroundColor);
+        configuration.Image = image;
         configuration.ImagePlacement = ResolveImagePlacement(view.Orientation);
         configuration.ImagePadding = (nfloat)Math.Max(0, view.ImageSpacing);
         configuration.BaseForegroundColor = foregroundColor;
         configuration.ContentInsets = ResolveContentInsets(view.Padding);
+        configuration.Background.CornerRadius = 0;
 
         button.Configuration = configuration;
+        button.SetTitle(view.Text, UIControlState.Normal);
+        button.SetTitle(view.Text, UIControlState.Selected);
+        button.SetImage(image, UIControlState.Normal);
+        button.SetImage(image, UIControlState.Selected);
         button.HorizontalAlignment = ResolveContentHorizontalAlignment(view.HorizontalContentAlignment);
-        var currentFont = button.TitleLabel?.Font;
-        if (button.TitleLabel is not null)
+
+        var titleLabel = button.TitleLabel;
+        if (titleLabel is not null)
         {
-            button.TitleLabel.Font = currentFont?.WithSize((nfloat)view.FontSize) ?? UIFont.SystemFontOfSize((nfloat)view.FontSize);
+            titleLabel.Font = titleFont;
+            titleLabel.Lines = view.Orientation == StackOrientation.Vertical ? 2 : 1;
+            titleLabel.LineBreakMode = view.Orientation == StackOrientation.Vertical
+                ? UILineBreakMode.WordWrap
+                : UILineBreakMode.TailTruncation;
+            titleLabel.TextAlignment = UITextAlignment.Center;
         }
 
         button.SetNeedsLayout();
     }
 
-    private static void UpdateButtonAppearance(ToggleButtonPlatformView button, ToggleButton view)
+    private static void UpdateButtonAppearance(UIButton button, ToggleButton view)
     {
         var foregroundColor = ResolveForegroundColor(view);
         var baseBackgroundColor = ResolveBackgroundColor(view);
 
         button.TintColor = foregroundColor;
-        button.UpdateBorderAppearance(view.BorderThickness, ResolveBorderColor(view, foregroundColor));
+        button.Layer.BorderWidth = (nfloat)view.BorderThickness.Left;
+        button.Layer.BorderColor = ResolveBorderColor(view, foregroundColor).CGColor;
         button.BackgroundColor = view.IsChecked ? foregroundColor.ColorWithAlpha(0.16f) : baseBackgroundColor;
         button.Alpha = button.Enabled ? 1f : 0.55f;
     }
@@ -277,109 +294,4 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, ToggleButton
         var color = brush?.Color;
         return color is null ? fallbackColor : color.ToPlatform();
     }
-
-    public sealed class ToggleButtonPlatformView : UIButton
-    {
-        private readonly CALayer _topBorderLayer = CreateBorderLayer();
-        private readonly CALayer _rightBorderLayer = CreateBorderLayer();
-        private readonly CALayer _bottomBorderLayer = CreateBorderLayer();
-        private readonly CALayer _leftBorderLayer = CreateBorderLayer();
-
-        private Thickness _borderThickness;
-        private UIColor? _borderColor;
-
-        public ToggleButtonPlatformView() : base(UIButtonType.System)
-        {
-            Layer.AddSublayer(_topBorderLayer);
-            Layer.AddSublayer(_rightBorderLayer);
-            Layer.AddSublayer(_bottomBorderLayer);
-            Layer.AddSublayer(_leftBorderLayer);
-        }
-
-        public void UpdateBorderAppearance(Thickness borderThickness, UIColor borderColor)
-        {
-            _borderThickness = borderThickness;
-            _borderColor = borderColor;
-            ApplyBorderAppearance();
-        }
-
-        public override void LayoutSubviews()
-        {
-            base.LayoutSubviews();
-            ApplyBorderAppearance();
-        }
-
-        private void ApplyBorderAppearance()
-        {
-            if (_borderColor == null)
-            {
-                return;
-            }
-
-            var normalizedThickness = NormalizeThickness(_borderThickness);
-            if (HasUniformThickness(normalizedThickness, out var uniformThickness))
-            {
-                Layer.BorderWidth = uniformThickness;
-                Layer.BorderColor = _borderColor.CGColor;
-                HideEdgeBorders();
-                return;
-            }
-
-            Layer.BorderWidth = 0;
-            Layer.BorderColor = null;
-
-            UpdateEdgeBorder(_topBorderLayer, 0, 0, Bounds.Width, (nfloat)normalizedThickness.Top, _borderColor);
-            UpdateEdgeBorder(_rightBorderLayer, Bounds.Width - (nfloat)normalizedThickness.Right, 0, (nfloat)normalizedThickness.Right, Bounds.Height, _borderColor);
-            UpdateEdgeBorder(_bottomBorderLayer, 0, Bounds.Height - (nfloat)normalizedThickness.Bottom, Bounds.Width, (nfloat)normalizedThickness.Bottom, _borderColor);
-            UpdateEdgeBorder(_leftBorderLayer, 0, 0, (nfloat)normalizedThickness.Left, Bounds.Height, _borderColor);
-        }
-
-        private void HideEdgeBorders()
-        {
-            _topBorderLayer.Hidden = true;
-            _rightBorderLayer.Hidden = true;
-            _bottomBorderLayer.Hidden = true;
-            _leftBorderLayer.Hidden = true;
-        }
-
-        private static CALayer CreateBorderLayer()
-        {
-            return new CALayer
-            {
-                Hidden = true,
-            };
-        }
-
-        private static Thickness NormalizeThickness(Thickness thickness)
-        {
-            return new Thickness(
-                Math.Max(0, thickness.Left),
-                Math.Max(0, thickness.Top),
-                Math.Max(0, thickness.Right),
-                Math.Max(0, thickness.Bottom));
-        }
-
-        private static bool HasUniformThickness(Thickness thickness, out nfloat uniformThickness)
-        {
-            uniformThickness = (nfloat)thickness.Left;
-                 const double tolerance = 0.001;
-                 return Math.Abs(thickness.Left - thickness.Top) < tolerance &&
-                     Math.Abs(thickness.Left - thickness.Right) < tolerance &&
-                     Math.Abs(thickness.Left - thickness.Bottom) < tolerance;
-        }
-
-        private static void UpdateEdgeBorder(CALayer borderLayer, nfloat x, nfloat y, nfloat width, nfloat height, UIColor color)
-        {
-            if (width <= 0 || height <= 0)
-            {
-                borderLayer.Hidden = true;
-                return;
-            }
-
-            borderLayer.Hidden = false;
-            borderLayer.BackgroundColor = color.CGColor;
-            borderLayer.Frame = new CGRect(x, y, width, height);
-        }
-    }
-
 }

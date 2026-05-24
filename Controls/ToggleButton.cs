@@ -1,6 +1,6 @@
 namespace MAUICustomControls.MacCatalyst.Controls;
 
-public class ToggleButton : View
+public class ToggleButton : ContentView
 {
     public event EventHandler? Toggled;
     public event EventHandler? Checked;

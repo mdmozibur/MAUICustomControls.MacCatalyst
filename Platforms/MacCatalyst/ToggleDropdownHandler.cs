@@ -197,6 +197,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         configuration.ImagePadding = image is null ? 0 : (nfloat)Math.Max(0, view.Spacing);
         configuration.BaseForegroundColor = tintColor;
         configuration.ContentInsets = ResolveContentInsets(view.Padding);
+        configuration.Background.CornerRadius = 0;
 
         button.Configuration = configuration;
         button.SetTitle(title, UIControlState.Normal);

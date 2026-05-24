@@ -56,6 +56,22 @@ public sealed class CheckBox : ContentView
     public static readonly BindableProperty ForegroundProperty =
         BindableProperty.Create(nameof(Foreground), typeof(SolidColorBrush), typeof(CheckBox), Brush.DodgerBlue);
 
+    public LayoutOptions HorizontalContentAlignment
+    {
+        get => (LayoutOptions)GetValue(HorizontalContentAlignmentProperty);
+        set => SetValue(HorizontalContentAlignmentProperty, value);
+    }
+    public static readonly BindableProperty HorizontalContentAlignmentProperty =
+        BindableProperty.Create(nameof(HorizontalContentAlignment), typeof(LayoutOptions), typeof(CheckBox), LayoutOptions.Start);
+
+    public LayoutOptions VerticalContentAlignment
+    {
+        get => (LayoutOptions)GetValue(VerticalContentAlignmentProperty);
+        set => SetValue(VerticalContentAlignmentProperty, value);
+    }
+    public static readonly BindableProperty VerticalContentAlignmentProperty =
+        BindableProperty.Create(nameof(VerticalContentAlignment), typeof(LayoutOptions), typeof(CheckBox), LayoutOptions.Center);
+
     private static void OnIsCheckedChanged(BindableObject bindable, object oldValue, object newValue)
     {
         if (bindable is not CheckBox checkBox || newValue is not bool isChecked)
