@@ -375,7 +375,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         return font;
     }
 
-    private static UIControlContentHorizontalAlignment ResolveContentHorizontalAlignment(LayoutOptions alignment)
+    public static UIControlContentHorizontalAlignment ResolveContentHorizontalAlignment(LayoutOptions alignment)
     {
         return alignment.Alignment switch
         {

@@ -30,7 +30,16 @@ public sealed class CheckBoxHandler : ViewHandler<CheckBox, UIButton>
         base.ConnectHandler(platformView);
 
         // Set up the button configuration
-        platformView.Configuration = UIButtonConfiguration.PlainButtonConfiguration;
+        var configuration = platformView.Configuration ?? UIButtonConfiguration.PlainButtonConfiguration;
+        configuration.Background.CornerRadius = 0;
+        configuration.Background.BackgroundColor = UIColor.Clear;
+        platformView.Configuration = configuration;
+
+        // Hide border and remove corner radius
+        platformView.Layer.BorderWidth = 0;
+        platformView.Layer.CornerRadius = 0;
+        platformView.BackgroundColor = UIColor.Clear;
+        platformView.HorizontalAlignment = ToggleDropdownHandler.ResolveContentHorizontalAlignment(VirtualView.HorizontalContentAlignment);
         
         // Use the proper event to handle selection changes
         platformView.AddTarget(ButtonTapped, UIControlEvent.TouchUpInside);
@@ -64,6 +73,7 @@ public sealed class CheckBoxHandler : ViewHandler<CheckBox, UIButton>
     public static void MapBorderThickness(CheckBoxHandler handler, CheckBox view)
     {
         handler.PlatformView.Layer.BorderWidth = (float)view.BorderThickness;
+        handler.PlatformView.Layer.CornerRadius = 0;
     }
 
     public static void MapIsSelected(CheckBoxHandler handler, CheckBox view)

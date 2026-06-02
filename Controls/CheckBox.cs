@@ -28,7 +28,7 @@ public sealed class CheckBox : ContentView
         set => SetValue(BorderThicknessProperty, value);
     }
     public static readonly BindableProperty BorderThicknessProperty =
-        BindableProperty.Create(nameof(BorderThickness), typeof(double), typeof(ToggleDropdown), 1.0);
+        BindableProperty.Create(nameof(BorderThickness), typeof(double), typeof(ToggleDropdown), 0.0);
 
     public static readonly BindableProperty TextProperty =
         BindableProperty.Create(nameof(Text), typeof(string), typeof(CheckBox), string.Empty);
@@ -62,7 +62,7 @@ public sealed class CheckBox : ContentView
         set => SetValue(HorizontalContentAlignmentProperty, value);
     }
     public static readonly BindableProperty HorizontalContentAlignmentProperty =
-        BindableProperty.Create(nameof(HorizontalContentAlignment), typeof(LayoutOptions), typeof(CheckBox), LayoutOptions.Start);
+        BindableProperty.Create(nameof(HorizontalContentAlignment), typeof(LayoutOptions), typeof(CheckBox), LayoutOptions.Fill);
 
     public LayoutOptions VerticalContentAlignment
     {
