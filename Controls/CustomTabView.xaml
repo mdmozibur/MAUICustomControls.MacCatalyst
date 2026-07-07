@@ -16,7 +16,7 @@
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroupList>
                 <VisualStateGroup Name="AddButtonStates">
-                    <VisualState Name="Normal" />
+                    <VisualState Name="AddButtonNormal" />
                     <VisualState Name="AddButtonVisible">
                         <VisualState.Setters>
                             <Setter TargetName="AddButton" Property="VisualElement.IsVisible" Value="True" />
@@ -30,7 +30,7 @@
                 </VisualStateGroup>
 
                 <VisualStateGroup Name="ScrollButtonsVisibilityStates">
-                    <VisualState Name="Normal" />
+                    <VisualState Name="ScrollButtonsVisibilityNormal" />
                     <VisualState Name="ScrollButtonsVisible">
                         <VisualState.Setters>
                             <Setter TargetName="LeftScrollButton" Property="VisualElement.IsVisible" Value="True" />
@@ -46,7 +46,7 @@
                 </VisualStateGroup>
 
                 <VisualStateGroup Name="ScrollButtonsAvailabilityStates">
-                    <VisualState Name="Normal" />
+                    <VisualState Name="ScrollButtonsAvailabilityNormal" />
                     <VisualState Name="ScrollButtonsInactive">
                         <VisualState.Setters>
                             <Setter TargetName="LeftScrollButton" Property="VisualElement.IsEnabled" Value="False" />
