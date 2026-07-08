@@ -6,7 +6,7 @@ public sealed class ProgressRing : ActivityIndicator
         nameof(IsActive),
         typeof(bool),
         typeof(ProgressRing),
-        true,
+        false,
         propertyChanged: OnIsActiveChanged);
 
     public static readonly BindableProperty IsIndeterminateProperty = BindableProperty.Create(
