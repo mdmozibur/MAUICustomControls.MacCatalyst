@@ -199,6 +199,20 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         configuration.ContentInsets = ResolveContentInsets(view.Padding);
         configuration.Background.CornerRadius = 0;
 
+        // A UIButtonConfiguration reasserts its own title font on every layout pass,
+        // overriding any direct titleLabel.Font assignment. Enforce the requested
+        // FontSize through the configuration's attribute transformer so it takes effect.
+        var titleFont = GetSystemFont((nfloat)Math.Max(view.FontSize, 8d));
+        configuration.TitleTextAttributesTransformer = incoming =>
+        {
+            // 'incoming' is an immutable (frozen) dictionary; mutate a copy instead.
+            var attributes = new UIStringAttributes(NSMutableDictionary.FromDictionary(incoming))
+            {
+                Font = titleFont,
+            };
+            return attributes.Dictionary;
+        };
+
         button.Configuration = configuration;
         button.SetTitle(title, UIControlState.Normal);
         button.SetTitle(title, UIControlState.Selected);
