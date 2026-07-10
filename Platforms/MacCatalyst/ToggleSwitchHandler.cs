@@ -97,7 +97,18 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
 
     public static void MapForeground(ToggleSwitchHandler handler, ToggleSwitch view)
     {
-        handler.PlatformView.TextLabel.TextColor = ResolveBrushColor(view.Foreground, Colors.Black.ToPlatform());
+        handler.PlatformView.TextLabel.TextColor = ResolveBrushColor(view.Foreground, ResolveThemeForeground());
+    }
+
+    private static UIColor ResolveThemeForeground()
+    {
+        if (Application.Current?.Resources.TryGetValue("ToggleSwitchContentForeground", out var resource) == true &&
+            resource is SolidColorBrush brush && brush.Color is Color color)
+        {
+            return color.ToPlatform();
+        }
+
+        return Colors.Black.ToPlatform();
     }
 
     public static void MapOnColor(ToggleSwitchHandler handler, ToggleSwitch view)

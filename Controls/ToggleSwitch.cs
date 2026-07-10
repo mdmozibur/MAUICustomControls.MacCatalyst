@@ -41,7 +41,7 @@ public sealed class ToggleSwitch : View
     }
 
     public static readonly BindableProperty ForegroundProperty =
-        BindableProperty.Create(nameof(Foreground), typeof(SolidColorBrush), typeof(ToggleSwitch), Brush.Black);
+        BindableProperty.Create(nameof(Foreground), typeof(SolidColorBrush), typeof(ToggleSwitch), null);
 
     public SolidColorBrush Foreground
     {
