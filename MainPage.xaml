@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:controls="clr-namespace:MAUICustomControls.MacCatalyst.Controls"
              xmlns:customObjects="clr-namespace:MAUICustomControls.MacCatalyst.Controls.CustomObjects"
+             xmlns:local="clr-namespace:MAUICustomControls.MacCatalyst"
              x:Class="MAUICustomControls.MacCatalyst.MainPage">
 
     <ScrollView>
@@ -108,6 +109,85 @@
             <Button
                 Text="Add tab"
                 Clicked="Button_Clicked1"/>
+
+            <Label Text="SemanticZoom"
+                FontSize="28"
+                FontAttributes="Bold" />
+
+            <Label Text="Click the toggle button (or a group header) to zoom out; click a group tile to jump to that group."
+                FontSize="14" />
+
+            <Button
+                x:Name="ToggleZoomButton"
+                Text="Zoom out"
+                HorizontalOptions="Start"
+                Clicked="OnToggleZoomClicked"/>
+
+            <controls:SemanticZoom
+                x:Name="AnimalsSemanticZoom"
+                HeightRequest="420">
+                <controls:SemanticZoom.ZoomedInView>
+                    <CollectionView
+                        x:Name="ZoomedInCollection"
+                        IsGrouped="True"
+                        BackgroundColor="#1E1E24">
+                        <CollectionView.GroupHeaderTemplate>
+                            <DataTemplate x:DataType="local:AnimalGroup">
+                                <Label Text="{Binding Name}"
+                                       FontSize="20"
+                                       FontAttributes="Bold"
+                                       TextColor="DodgerBlue"
+                                       Padding="10,8"
+                                       BackgroundColor="#2A2A33">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnGroupHeaderTapped"/>
+                                    </Label.GestureRecognizers>
+                                </Label>
+                            </DataTemplate>
+                        </CollectionView.GroupHeaderTemplate>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <Label Text="{Binding .}"
+                                       FontSize="16"
+                                       Padding="24,6"/>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </controls:SemanticZoom.ZoomedInView>
+                <controls:SemanticZoom.ZoomedOutView>
+                    <CollectionView
+                        x:Name="ZoomedOutCollection"
+                        SelectionMode="Single"
+                        BackgroundColor="#1E1E24">
+                        <CollectionView.ItemsLayout>
+                            <GridItemsLayout Orientation="Vertical" Span="3"/>
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="local:AnimalGroup">
+                                <Border StrokeThickness="1"
+                                        Stroke="#444"
+                                        BackgroundColor="#2A2A33"
+                                        Margin="8"
+                                        StrokeShape="RoundRectangle 8">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnGroupTileTapped"/>
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout Padding="12" Spacing="4">
+                                        <Label Text="{Binding Name}"
+                                               FontSize="22"
+                                               FontAttributes="Bold"
+                                               TextColor="DodgerBlue"
+                                               HorizontalOptions="Center"/>
+                                        <Label Text="{Binding Count, StringFormat='{0} items'}"
+                                               FontSize="13"
+                                               HorizontalOptions="Center"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </controls:SemanticZoom.ZoomedOutView>
+            </controls:SemanticZoom>
 
         </VerticalStackLayout>
     </ScrollView>

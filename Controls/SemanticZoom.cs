@@ -12,6 +12,8 @@ public sealed class SemanticZoom : ContentView
     private readonly Grid _container = new();
     private bool _isZoomedInViewActive = true;
     private bool _isTransitioning;
+    private GroupableItemsView? _wiredZoomedOutItemsView;
+    private object? _pendingNavigationGroup;
 
     public static readonly BindableProperty ZoomedInViewProperty =
         BindableProperty.Create(nameof(ZoomedInView), typeof(View), typeof(SemanticZoom), null, propertyChanged: OnViewChanged);
@@ -39,7 +41,7 @@ public sealed class SemanticZoom : ContentView
             if (_isZoomedInViewActive == value || _isTransitioning)
                 return;
 
-            var args = new SemanticZoomViewChangedEventArgs(_isZoomedInViewActive);
+            var args = new SemanticZoomViewChangedEventArgs(_isZoomedInViewActive, _pendingNavigationGroup);
             _isZoomedInViewActive = value;
             ViewChangeStarted?.Invoke(this, args);
             PerformTransition(args.IsSourceZoomedInView);
@@ -47,6 +49,8 @@ public sealed class SemanticZoom : ContentView
     }
 
     public event EventHandler<SemanticZoomViewChangedEventArgs>? ViewChangeStarted;
+
+    public event EventHandler<SemanticZoomViewChangedEventArgs>? ViewChangeCompleted;
 
     /// <summary>
     /// Set by the platform handler to provide native animation.
@@ -66,6 +70,118 @@ public sealed class SemanticZoom : ContentView
     public void ToggleActiveView()
     {
         IsZoomedInViewActive = !IsZoomedInViewActive;
+    }
+
+    /// <summary>
+    /// Navigates to the given group: switches to the zoomed-in view (if needed)
+    /// and scrolls its GroupableItemsView so the group's first item is at the top.
+    /// This mirrors UWP SemanticZoom group navigation.
+    /// </summary>
+    public void NavigateToGroup(object group)
+    {
+        _pendingNavigationGroup = group;
+
+        if (!_isZoomedInViewActive)
+        {
+            IsZoomedInViewActive = true;
+            // PerformTransition consumes _pendingNavigationGroup; if the
+            // transition was blocked (e.g. mid-transition) just clear it.
+            if (!_isZoomedInViewActive)
+                _pendingNavigationGroup = null;
+        }
+        else
+        {
+            ScrollZoomedInViewToPendingGroup();
+        }
+    }
+
+    private void OnZoomedOutSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        var group = e.CurrentSelection.FirstOrDefault();
+        if (group == null)
+            return;
+
+        // Clear the selection so the same group can be tapped again later.
+        if (sender is SelectableItemsView selectable)
+            Dispatcher.Dispatch(() => selectable.SelectedItem = null);
+
+        NavigateToGroup(group);
+    }
+
+    private void WireZoomedOutNavigation()
+    {
+        var itemsView = FindGroupableItemsView(ZoomedOutView);
+        if (ReferenceEquals(itemsView, _wiredZoomedOutItemsView))
+            return;
+
+        if (_wiredZoomedOutItemsView != null)
+            _wiredZoomedOutItemsView.SelectionChanged -= OnZoomedOutSelectionChanged;
+
+        _wiredZoomedOutItemsView = itemsView;
+
+        if (itemsView == null)
+            return;
+
+        // SemanticZoom owns group-click navigation, so make sure taps are
+        // reported through selection (mirrors UWP's IsItemClickEnabled).
+        if (itemsView.SelectionMode == SelectionMode.None)
+            itemsView.SelectionMode = SelectionMode.Single;
+
+        itemsView.SelectionChanged += OnZoomedOutSelectionChanged;
+    }
+
+    private void ScrollZoomedInViewToPendingGroup()
+    {
+        var group = _pendingNavigationGroup;
+        _pendingNavigationGroup = null;
+        if (group == null)
+            return;
+
+        var itemsView = FindGroupableItemsView(ZoomedInView);
+        if (itemsView?.ItemsSource == null)
+            return;
+
+        var groupIndex = IndexOfGroup(itemsView.ItemsSource, group);
+        if (groupIndex < 0)
+            return;
+
+        // Dispatch so the (possibly just-made-visible) view has a chance to lay out.
+        Dispatcher.Dispatch(() =>
+            itemsView.ScrollTo(index: 0, groupIndex: groupIndex, position: ScrollToPosition.Start, animate: false));
+    }
+
+    private static int IndexOfGroup(System.Collections.IEnumerable itemsSource, object group)
+    {
+        var target = UnwrapGroup(group);
+        var index = 0;
+        foreach (var item in itemsSource)
+        {
+            var candidate = UnwrapGroup(item);
+            if (ReferenceEquals(candidate, target) || Equals(candidate, target))
+                return index;
+            index++;
+        }
+        return -1;
+    }
+
+    private static object? UnwrapGroup(object? item) =>
+        item is CollectionViewGroup cvg ? cvg.Group : item;
+
+    private static GroupableItemsView? FindGroupableItemsView(Element? root)
+    {
+        if (root == null)
+            return null;
+
+        if (root is GroupableItemsView itemsView)
+            return itemsView;
+
+        foreach (var child in ((IVisualTreeElement)root).GetVisualChildren())
+        {
+            if (child is Element element && FindGroupableItemsView(element) is { } found)
+                return found;
+        }
+
+        return null;
     }
 
     private void PerformTransition(bool zoomingOut)
@@ -93,12 +209,18 @@ public sealed class SemanticZoom : ContentView
         incoming.IsVisible = true;
         incoming.Opacity = 0;
 
+        // If this transition was triggered by group navigation, position the
+        // zoomed-in list on the target group while it is still fading in.
+        if (!zoomingOut)
+            ScrollZoomedInViewToPendingGroup();
+
         if (PlatformAnimateTransition != null)
         {
             PlatformAnimateTransition(incoming, outgoing, zoomingOut, () =>
             {
                 outgoing.IsVisible = false;
                 _isTransitioning = false;
+                ViewChangeCompleted?.Invoke(this, new SemanticZoomViewChangedEventArgs(zoomingOut));
             });
         }
         else
@@ -125,6 +247,7 @@ public sealed class SemanticZoom : ContentView
         outgoing.Scale = 1;
         outgoing.Opacity = 1;
         _isTransitioning = false;
+        ViewChangeCompleted?.Invoke(this, new SemanticZoomViewChangedEventArgs(zoomingOut));
     }
 
     private void RebuildContainer()
@@ -144,6 +267,8 @@ public sealed class SemanticZoom : ContentView
             ZoomedOutView.Opacity = !_isZoomedInViewActive ? 1 : 0;
             _container.Children.Add(ZoomedOutView);
         }
+
+        WireZoomedOutNavigation();
     }
 
     private static void OnViewChanged(BindableObject bindable, object? oldValue, object? newValue)
@@ -157,9 +282,10 @@ public sealed class SemanticZoom : ContentView
 
 public sealed class SemanticZoomViewChangedEventArgs : EventArgs
 {
-    public SemanticZoomViewChangedEventArgs(bool isSourceZoomedInView)
+    public SemanticZoomViewChangedEventArgs(bool isSourceZoomedInView, object? sourceItem = null)
     {
         IsSourceZoomedInView = isSourceZoomedInView;
+        SourceItem = sourceItem;
     }
 
     /// <summary>
@@ -167,4 +293,10 @@ public sealed class SemanticZoomViewChangedEventArgs : EventArgs
     /// False when transitioning FROM zoomed-out TO zoomed-in.
     /// </summary>
     public bool IsSourceZoomedInView { get; }
+
+    /// <summary>
+    /// The group item that triggered the view change (when navigating from the
+    /// zoomed-out view by clicking a group), otherwise null.
+    /// </summary>
+    public object? SourceItem { get; }
 }
