@@ -1,7 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-#if DEBUG
-using Microsoft.Maui.DevFlow.Agent;
-#endif
 
 namespace MAUICustomControls.MacCatalyst;
 
@@ -36,7 +33,6 @@ public static class MauiProgram
 
 #if DEBUG
 		builder.Logging.AddDebug();
-		builder.AddMauiDevFlowAgent();
 #endif
 
 		return builder.Build();

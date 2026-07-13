@@ -125,7 +125,8 @@
 
             <controls:SemanticZoom
                 x:Name="AnimalsSemanticZoom"
-                HeightRequest="420">
+                HeightRequest="420"
+                IsZoomedInViewHeaderSticky="True">
                 <controls:SemanticZoom.ZoomedInView>
                     <CollectionView
                         x:Name="ZoomedInCollection"

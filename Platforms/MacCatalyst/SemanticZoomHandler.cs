@@ -25,7 +25,8 @@ public sealed class SemanticZoomHandler : ContentViewHandler
 
     public static PropertyMapper<SemanticZoom, SemanticZoomHandler> PropertyMapper = new(ViewMapper)
     {
-        [nameof(IContentView.Content)] = MapContent
+        [nameof(IContentView.Content)] = MapContent,
+        [nameof(SemanticZoom.IsZoomedInViewHeaderSticky)] = MapIsZoomedInViewHeaderSticky
     };
 
     public SemanticZoomHandler() : base(PropertyMapper)
@@ -39,6 +40,7 @@ public sealed class SemanticZoomHandler : ContentViewHandler
         if (VirtualView is SemanticZoom semanticZoom)
         {
             semanticZoom.PlatformAnimateTransition = AnimateTransition;
+            UpdateZoomedInViewHeaderStickiness(semanticZoom);
         }
     }
 
@@ -50,6 +52,45 @@ public sealed class SemanticZoomHandler : ContentViewHandler
         }
 
         base.DisconnectHandler(platformView);
+    }
+
+    public static void MapIsZoomedInViewHeaderSticky(SemanticZoomHandler handler, SemanticZoom view)
+    {
+        handler.UpdateZoomedInViewHeaderStickiness(view);
+        view.Dispatcher.Dispatch(() => handler.UpdateZoomedInViewHeaderStickiness(view));
+    }
+
+    private void UpdateZoomedInViewHeaderStickiness(SemanticZoom semanticZoom)
+    {
+        var collectionView = FindCollectionView(semanticZoom.ZoomedInView);
+        if (collectionView == null || MauiContext == null)
+            return;
+
+        if (GetPlatformView(collectionView, MauiContext) is not UICollectionView platformCollectionView ||
+            platformCollectionView.CollectionViewLayout is not UICollectionViewFlowLayout layout)
+        {
+            return;
+        }
+
+        layout.SectionHeadersPinToVisibleBounds = semanticZoom.IsZoomedInViewHeaderSticky;
+        layout.InvalidateLayout();
+    }
+
+    private static CollectionView? FindCollectionView(Element? root)
+    {
+        if (root == null)
+            return null;
+
+        if (root is CollectionView collectionView)
+            return collectionView;
+
+        foreach (var child in ((IVisualTreeElement)root).GetVisualChildren())
+        {
+            if (child is Element element && FindCollectionView(element) is { } found)
+                return found;
+        }
+
+        return null;
     }
 
     private void AnimateTransition(View incoming, View outgoing, bool zoomingOut, Action onComplete)

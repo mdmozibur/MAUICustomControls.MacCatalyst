@@ -137,7 +137,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
     private static void UpdateButtonContent(UIButton button, ToggleButton view)
     {
         var configuration = button.Configuration ?? UIButtonConfiguration.PlainButtonConfiguration;
-        var foregroundColor = ResolveForegroundColor(view);
+        var foregroundColor = ResolveContentColor(view);
 
         var hasIcon = !string.IsNullOrWhiteSpace(view.IconGlyph);
         var titleFontSize = (nfloat)Math.Max(hasIcon ? Math.Min(view.FontSize * 0.75, 13.0) : view.FontSize, 8d);
@@ -175,13 +175,14 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
 
     private static void UpdateButtonAppearance(UIButton button, ToggleButton view)
     {
-        var foregroundColor = ResolveForegroundColor(view);
+        var contentColor = ResolveContentColor(view);
+        var accentColor = ResolveAccentColor(view);
         var baseBackgroundColor = ResolveBackgroundColor(view);
 
-        button.TintColor = foregroundColor;
+        button.TintColor = contentColor;
         button.Layer.BorderWidth = (nfloat)view.BorderThickness.Left;
-        button.Layer.BorderColor = ResolveBorderColor(view, foregroundColor).CGColor;
-        button.BackgroundColor = view.IsChecked ? foregroundColor.ColorWithAlpha(0.16f) : baseBackgroundColor;
+        button.Layer.BorderColor = ResolveBorderColor(view, accentColor).CGColor;
+        button.BackgroundColor = view.IsChecked ? accentColor.ColorWithAlpha(0.16f) : baseBackgroundColor;
         button.Alpha = button.Enabled ? 1f : 0.55f;
     }
 
@@ -284,7 +285,20 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         return ResolveBrushColor(view.BorderBrush as SolidColorBrush, defaultBorderColor);
     }
 
-    private static UIColor ResolveForegroundColor(ToggleButton view)
+    // Content (glyph/text) color: normal color when unchecked, accent color when checked.
+    private static UIColor ResolveContentColor(ToggleButton view)
+    {
+        return view.IsChecked ? ResolveAccentColor(view) : ResolveNormalColor(view);
+    }
+
+    // Adaptive foreground used in the unselected state (dark text on light theme, light text on dark theme).
+    private static UIColor ResolveNormalColor(ToggleButton view)
+    {
+        return UIColor.Label;
+    }
+
+    // Accent color used for the selected/checked state and the highlight background.
+    private static UIColor ResolveAccentColor(ToggleButton view)
     {
         return ResolveBrushColor(view.Foreground, global::Microsoft.Maui.Graphics.Colors.DodgerBlue.ToPlatform());
     }

@@ -21,6 +21,9 @@ public sealed class SemanticZoom : ContentView
     public static readonly BindableProperty ZoomedOutViewProperty =
         BindableProperty.Create(nameof(ZoomedOutView), typeof(View), typeof(SemanticZoom), null, propertyChanged: OnViewChanged);
 
+    public static readonly BindableProperty IsZoomedInViewHeaderStickyProperty =
+        BindableProperty.Create(nameof(IsZoomedInViewHeaderSticky), typeof(bool), typeof(SemanticZoom), false);
+
     public View? ZoomedInView
     {
         get => (View?)GetValue(ZoomedInViewProperty);
@@ -31,6 +34,16 @@ public sealed class SemanticZoom : ContentView
     {
         get => (View?)GetValue(ZoomedOutViewProperty);
         set => SetValue(ZoomedOutViewProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets whether grouped headers in the zoomed-in CollectionView
+    /// remain visible while their group is scrolled. Default is false.
+    /// </summary>
+    public bool IsZoomedInViewHeaderSticky
+    {
+        get => (bool)GetValue(IsZoomedInViewHeaderStickyProperty);
+        set => SetValue(IsZoomedInViewHeaderStickyProperty, value);
     }
 
     public bool IsZoomedInViewActive
