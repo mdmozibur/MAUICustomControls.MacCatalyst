@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-maccatalyst</TargetFramework>
+    <RootNamespace>Lottie.MacCatalyst.Binding</RootNamespace>
+    <AssemblyName>Lottie.MacCatalyst.Binding</AssemblyName>
+    <IsBindingProject>true</IsBindingProject>
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <LottieVersion>4.6.1</LottieVersion>
+    <LottieArchiveChecksum>03d3f3b085da9479bcab7b0ad4b6d75a88425d27bf3c7582698fddce14c9181f</LottieArchiveChecksum>
+    <LottieNativeDirectory>$(BaseIntermediateOutputPath)lottie-native</LottieNativeDirectory>
+    <LottieArchive>$(LottieNativeDirectory)/Lottie.xcframework.zip</LottieArchive>
+    <LottieFramework>$(LottieNativeDirectory)/Lottie.xcframework</LottieFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ObjcBindingApiDefinition Include="ApiDefinition.cs" />
+    <ObjcBindingCoreSource Include="StructsAndEnums.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <NativeReference Include="$(LottieFramework)">
+      <Kind>Framework</Kind>
+      <SmartLink>true</SmartLink>
+      <LinkWithSwiftSystemLibraries>true</LinkWithSwiftSystemLibraries>
+      <Frameworks>Foundation UIKit CoreGraphics QuartzCore CoreText</Frameworks>
+    </NativeReference>
+  </ItemGroup>
+
+  <Target Name="PrepareLottieNativeFramework" BeforeTargets="PrepareForBuild"
+          Condition="!Exists('$(LottieFramework)/Info.plist')">
+    <MakeDir Directories="$(LottieNativeDirectory)" />
+    <Exec Command="/usr/bin/curl --fail --location --silent --show-error 'https://github.com/airbnb/lottie-ios/releases/download/$(LottieVersion)/Lottie.xcframework.zip' --output &quot;$(LottieArchive)&quot;" />
+    <Exec Command="echo '$(LottieArchiveChecksum)  $(LottieArchive)' | /usr/bin/shasum -a 256 -c -" />
+    <Exec Command="/usr/bin/ditto -x -k &quot;$(LottieArchive)&quot; &quot;$(LottieNativeDirectory)&quot;" />
+    <Error Condition="!Exists('$(LottieFramework)/Info.plist')"
+           Text="Airbnb Lottie XCFramework could not be prepared at $(LottieFramework)." />
+  </Target>
+
+</Project>

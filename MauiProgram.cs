@@ -27,6 +27,7 @@ public static class MauiProgram
 				handlers.AddHandler(typeof(Controls.ToggleSwitch), typeof(Platforms.MacCatalyst.ToggleSwitchHandler));
                 handlers.AddHandler(typeof(Controls.SemanticZoom), typeof(Platforms.MacCatalyst.SemanticZoomHandler));
                 handlers.AddHandler(typeof(Controls.SegmentedButtons), typeof(Platforms.MacCatalyst.SegmentedButtonsHandler));
+                handlers.AddHandler(typeof(Controls.AnimatedVisualPlayer), typeof(Platforms.MacCatalyst.AnimatedVisualPlayerHandler));
 
                 Platforms.MacCatalyst.EntryHandlerCustomization.Configure();
 #endif

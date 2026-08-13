@@ -61,4 +61,12 @@
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
 	</ItemGroup>
 
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
+		<ProjectReference Include="Lottie.MacCatalyst.Binding/Lottie.MacCatalyst.Binding.csproj" GlobalPropertiesToRemove="MtouchLink" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Remove="Lottie.MacCatalyst.Binding/**/*.cs" />
+	</ItemGroup>
+
 </Project>
