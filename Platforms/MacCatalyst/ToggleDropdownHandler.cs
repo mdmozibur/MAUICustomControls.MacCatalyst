@@ -25,6 +25,11 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         [nameof(ToggleDropdown.SelectedOption)] = MapSelectedOption,
         [nameof(ToggleDropdown.IsChecked)] = MapIsSelected,
         [nameof(ToggleDropdown.TintColor)] = MapColor,
+        [nameof(ToggleDropdown.ChangeUnselectedTextOnSelectionChange)] = MapText,
+        [nameof(ToggleDropdown.IsActionMenu)] = MapIsActionMenu,
+        [nameof(ToggleDropdown.IconGlyph)] = MapIcon,
+        [nameof(ToggleDropdown.IconFontFamily)] = MapIcon,
+        [nameof(ToggleDropdown.SystemIconName)] = MapIcon,
     };
 
     public ToggleDropdownHandler() : base(PropertyMapper)
@@ -60,6 +65,11 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
 
     private void ButtonTapped(object? sender, EventArgs e)
     {
+        if (VirtualView.IsActionMenu)
+        {
+            return;
+        }
+
         if (!VirtualView.IsChecked)
         {
             VirtualView.MarkNextToggleAsUserInitiated();
@@ -75,10 +85,18 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
             return;
         }
 
-        VirtualView.MarkNextToggleAsUserInitiated();
         VirtualView.MarkNextSelectionAsUserInitiated();
-        VirtualView.IsChecked = true;
+        if (!VirtualView.IsActionMenu)
+        {
+            VirtualView.MarkNextToggleAsUserInitiated();
+            VirtualView.IsChecked = true;
+        }
         VirtualView.SelectedOption = selectedOption;
+
+        if (VirtualView.IsActionMenu)
+        {
+            VirtualView.SetSelectedOptionFromCompatibility(null, true);
+        }
     }
 
     protected override UIButton CreatePlatformView()
@@ -151,6 +169,17 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         UpdateButtonAppearance(handler.PlatformView, view);
     }
 
+    public static void MapIsActionMenu(ToggleDropdownHandler handler, ToggleDropdown view)
+    {
+        UpdateMenu(handler.PlatformView, view, handler.OptionChosen);
+        UpdateButtonAppearance(handler.PlatformView, view);
+    }
+
+    public static void MapIcon(ToggleDropdownHandler handler, ToggleDropdown view)
+    {
+        UpdateButtonAppearance(handler.PlatformView, view);
+    }
+
     private static void VirtualView_Options_CollectionChanged(ToggleDropdownHandler handler, ToggleDropdown view)
     {
         UpdateMenu(handler.PlatformView, view, handler.OptionChosen);
@@ -174,7 +203,9 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
             var option = view.Options[i];
             var image = CreateOptionImage(option, tintColor);
             var action = UIAction.Create(option.Text, image, null, optionChosen);
-            action.State = string.Equals(option.Text, selectedText, StringComparison.Ordinal) ? UIMenuElementState.On : UIMenuElementState.Off;
+            action.State = !view.IsActionMenu && string.Equals(option.Text, selectedText, StringComparison.Ordinal)
+                ? UIMenuElementState.On
+                : UIMenuElementState.Off;
             menuItems[i] = action;
         }
 
@@ -185,7 +216,9 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
     {
         var tintColor = view.TintColor.ToPlatform();
         var configuration = button.Configuration ?? UIButtonConfiguration.PlainButtonConfiguration;
-        var title = view.ChangeUnselectedTextOnSelectionChange ? (view.SelectedOption?.Text ?? view.UnselectedText) : view.UnselectedText;
+        var title = view.IsActionMenu
+            ? view.UnselectedText
+            : view.ChangeUnselectedTextOnSelectionChange ? (view.SelectedOption?.Text ?? view.UnselectedText) : view.UnselectedText;
         title ??= string.Empty;
         var image = CreateSelectedImage(view, tintColor);
 
@@ -232,11 +265,12 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
                 : UILineBreakMode.TailTruncation;
             titleLabel.TextAlignment = UITextAlignment.Center;
         }
-        button.Selected = view.IsChecked;
-        button.ShowsMenuAsPrimaryAction = view.IsChecked && button.Menu is not null;
+        var visuallySelected = !view.IsActionMenu && view.IsChecked;
+        button.Selected = visuallySelected;
+        button.ShowsMenuAsPrimaryAction = (view.IsActionMenu || view.IsChecked) && button.Menu is not null;
         button.Layer.BorderWidth = (float)view.BorderThickness;
-        button.Layer.BorderColor = tintColor.ColorWithAlpha(view.IsChecked ? 0.75f : 0.35f).CGColor;
-        button.BackgroundColor = view.IsChecked ? tintColor.ColorWithAlpha(0.14f) : UIColor.Clear;
+        button.Layer.BorderColor = tintColor.ColorWithAlpha(visuallySelected ? 0.75f : 0.35f).CGColor;
+        button.BackgroundColor = visuallySelected ? tintColor.ColorWithAlpha(0.14f) : UIColor.Clear;
         button.SetNeedsLayout();
     }
 
@@ -251,6 +285,23 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
 
     private static UIImage? CreateSelectedImage(ToggleDropdown view, UIColor tintColor)
     {
+        if (!string.IsNullOrWhiteSpace(view.SystemIconName))
+        {
+            var config = UIImageSymbolConfiguration.Create(UIImageSymbolScale.Medium);
+            var image = UIImage.GetSystemImage(view.SystemIconName, config);
+            return image?.ApplyTintColor(tintColor, UIImageRenderingMode.AlwaysOriginal);
+        }
+
+        if (!string.IsNullOrWhiteSpace(view.IconGlyph) && !string.IsNullOrWhiteSpace(view.IconFontFamily))
+        {
+            return CreateFontGlyphImage(
+                view.IconGlyph,
+                view.IconFontFamily,
+                view.IconFontSize,
+                tintColor,
+                view.IconFontWeight);
+        }
+
         if (!view.SelectedOption.HasValue)
         {
             return null;

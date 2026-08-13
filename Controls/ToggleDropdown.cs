@@ -119,6 +119,38 @@ public sealed partial class ToggleDropdown : ContentView
     public static readonly BindableProperty ChangeUnselectedTextOnSelectionChangeProperty =
         BindableProperty.Create(nameof(ChangeUnselectedTextOnSelectionChange), typeof(bool), typeof(ToggleDropdown), true);
 
+    public bool IsActionMenu
+    {
+        get => (bool)GetValue(IsActionMenuProperty);
+        set => SetValue(IsActionMenuProperty, value);
+    }
+    public static readonly BindableProperty IsActionMenuProperty =
+        BindableProperty.Create(nameof(IsActionMenu), typeof(bool), typeof(ToggleDropdown), false);
+
+    public string IconGlyph
+    {
+        get => (string)GetValue(IconGlyphProperty);
+        set => SetValue(IconGlyphProperty, value);
+    }
+    public static readonly BindableProperty IconGlyphProperty =
+        BindableProperty.Create(nameof(IconGlyph), typeof(string), typeof(ToggleDropdown), string.Empty);
+
+    public string IconFontFamily
+    {
+        get => (string)GetValue(IconFontFamilyProperty);
+        set => SetValue(IconFontFamilyProperty, value);
+    }
+    public static readonly BindableProperty IconFontFamilyProperty =
+        BindableProperty.Create(nameof(IconFontFamily), typeof(string), typeof(ToggleDropdown), string.Empty);
+
+    public string SystemIconName
+    {
+        get => (string)GetValue(SystemIconNameProperty);
+        set => SetValue(SystemIconNameProperty, value);
+    }
+    public static readonly BindableProperty SystemIconNameProperty =
+        BindableProperty.Create(nameof(SystemIconName), typeof(string), typeof(ToggleDropdown), string.Empty);
+
     public ToggleDropdown()
     {
         Options = new ObservableCollection<SelectorOption>();
