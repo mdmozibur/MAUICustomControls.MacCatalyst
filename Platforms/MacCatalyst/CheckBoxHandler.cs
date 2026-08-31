@@ -13,6 +13,7 @@ public sealed class CheckBoxHandler : ViewHandler<CheckBox, UIButton>
     {
         [nameof(CheckBox.Text)] = MapText,
         [nameof(CheckBox.FontSize)] = MapFontSize,
+        [nameof(CheckBox.FontAttributes)] = MapFontAttributes,
         [nameof(CheckBox.BorderThickness)] = MapBorderThickness,
         [nameof(CheckBox.IsChecked)] = MapIsSelected,
         [nameof(CheckBox.Foreground)] = MapColor,
@@ -64,10 +65,25 @@ public sealed class CheckBoxHandler : ViewHandler<CheckBox, UIButton>
         handler.PlatformView.SetTitle(view.Text, UIControlState.Normal);
     }
 
-    public static void MapFontSize(CheckBoxHandler handler, CheckBox view)
+    public static void MapFontSize(CheckBoxHandler handler, CheckBox view) => ApplyFont(handler, view);
+
+    public static void MapFontAttributes(CheckBoxHandler handler, CheckBox view) => ApplyFont(handler, view);
+
+    private static void ApplyFont(CheckBoxHandler handler, CheckBox view)
     {
-        var currentFont = handler.PlatformView.TitleLabel?.Font;
-        handler.PlatformView.TitleLabel.Font = currentFont?.WithSize((nfloat)view.FontSize) ?? UIFont.SystemFontOfSize((nfloat)view.FontSize);
+        var label = handler.PlatformView.TitleLabel;
+        if (label is null)
+        {
+            return;
+        }
+
+        var size = (nfloat)view.FontSize;
+        label.Font = view.FontAttributes switch
+        {
+            FontAttributes.Bold => UIFont.BoldSystemFontOfSize(size),
+            FontAttributes.Italic => UIFont.ItalicSystemFontOfSize(size),
+            _ => UIFont.SystemFontOfSize(size),
+        };
     }
 
     public static void MapBorderThickness(CheckBoxHandler handler, CheckBox view)

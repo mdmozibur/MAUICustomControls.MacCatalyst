@@ -36,6 +36,9 @@ public sealed class CheckBox : ContentView
     public static readonly BindableProperty FontSizeProperty =
         BindableProperty.Create(nameof(FontSize), typeof(double), typeof(CheckBox), 14d);
 
+    public static readonly BindableProperty FontAttributesProperty =
+        BindableProperty.Create(nameof(FontAttributes), typeof(FontAttributes), typeof(CheckBox), FontAttributes.None);
+
     public string Text
     {
         get => (string)GetValue(TextProperty);
@@ -46,6 +49,12 @@ public sealed class CheckBox : ContentView
     {
         get => (double)GetValue(FontSizeProperty);
         set => SetValue(FontSizeProperty, value);
+    }
+
+    public FontAttributes FontAttributes
+    {
+        get => (FontAttributes)GetValue(FontAttributesProperty);
+        set => SetValue(FontAttributesProperty, value);
     }
 
     public SolidColorBrush Foreground
