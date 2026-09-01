@@ -33,6 +33,9 @@ public partial class CustomTabView : Grid
 
     public event EventHandler<TabItem>? CloseButtonClick;
 
+    // Raised when a tab's duplicate action is requested (UWP TabListView.DuplicateRequested).
+    public event EventHandler<TabItem>? DuplicateRequested;
+
     public event EventHandler<SelectionChangedEventArgs>? SelectionChanged;
 
     public static readonly BindableProperty AddButtonVisibilityProperty =
@@ -72,6 +75,24 @@ public partial class CustomTabView : Grid
     }
 
     public IList<object> Items => _items;
+
+    // Tracks whether each tab's shapelist can offer "copy file path" (UWP TabListView.AddShapelist).
+    private readonly Dictionary<object, bool> _filePathCopyAvailability = new();
+
+    // Adds a shapelist view-model as a tab (typed as object to avoid a view-model project reference).
+    public void AddShapelist(object model, bool canCopyFilePath)
+    {
+        if (model is null || _items.Contains(model))
+        {
+            return;
+        }
+
+        _filePathCopyAvailability[model] = canCopyFilePath;
+        _items.Add(model);
+    }
+
+    public bool CanCopyFilePath(object model) =>
+        model is not null && _filePathCopyAvailability.TryGetValue(model, out var canCopy) && canCopy;
 
     public CustomTabView()
     {
