@@ -96,8 +96,14 @@ public sealed class ComboBox : ContentView
         get => (IList<SelectorOption>)GetValue(OptionsProperty);
         set => SetValue(OptionsProperty, value);
     }
+    // The platform handler walks Options every time the property is mapped, which happens as soon as a
+    // handler is attached - including when a ComboBox living in a DataTemplate is re-realized after its
+    // value has been reset to the property default. A plain null default therefore leaves a window in
+    // which Options is null; a default value creator closes it by handing out a real collection instead.
     public static readonly BindableProperty OptionsProperty =
-        BindableProperty.Create(nameof(Options), typeof(IList<SelectorOption>), typeof(ComboBox), null);
+        BindableProperty.Create(nameof(Options), typeof(IList<SelectorOption>), typeof(ComboBox), null,
+            defaultValueCreator: static _ => new ObservableCollection<SelectorOption>(),
+            coerceValue: static (_, value) => value ?? new ObservableCollection<SelectorOption>());
 
     public SelectorOption? SelectedOption
     {
@@ -142,7 +148,6 @@ public sealed class ComboBox : ContentView
 
     public ComboBox()
     {
-        Options = new ObservableCollection<SelectorOption>();
         Loaded += (_, _) => LayoutUpdated?.Invoke(this, EventArgs.Empty);
     }
 

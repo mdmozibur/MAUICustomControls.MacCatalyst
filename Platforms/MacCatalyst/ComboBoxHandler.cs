@@ -96,12 +96,18 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, UIButton>
         // Rebuild the menu
         handler.PlatformView.Menu = null;
 
-        var menuItems = new UIAction[view.Options.Count];
+        // Mirrors ToggleDropdownHandler: a mapper can run against a view whose Options is still empty
+        // (or, for a value reset to the property default, null), and UIMenu.Create rejects an empty set.
+        var options = view.Options;
+        if (options is null || options.Count == 0)
+            return;
+
+        var menuItems = new UIAction[options.Count];
         var config = UIImageSymbolConfiguration.Create(UIImageSymbolScale.Medium);
 
-        for (int i = 0; i < view.Options.Count; i++)
+        for (int i = 0; i < options.Count; i++)
         {
-            var option = view.Options[i];
+            var option = options[i];
             var image = string.IsNullOrWhiteSpace(option.SystemIconName) ? null : UIImage.GetSystemImage(option.SystemIconName, config);
             menuItems[i] = UIAction.Create(option.Text, image, null, handler.OptionChosen);
         }

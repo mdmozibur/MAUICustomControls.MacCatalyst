@@ -36,8 +36,29 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         ConfigureButton(platformView);
         platformView.AddTarget(ButtonTapped, UIControlEvent.TouchUpInside);
 
+        // The glyph is rasterized into a UIImage with the foreground color baked in, so it does
+        // not follow the dynamic UIColor.Label the way the title does. Re-render on theme change.
+        if (Application.Current is Application application)
+        {
+            application.RequestedThemeChanged += OnRequestedThemeChanged;
+        }
+
         UpdateButtonContent(platformView, VirtualView);
         UpdateButtonAppearance(platformView, VirtualView);
+    }
+
+    private void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+
+        if (PlatformView is null || VirtualView is null)
+        {
+            return;
+        }
+
+        UpdateButtonContent(PlatformView, VirtualView);
+        UpdateButtonAppearance(PlatformView, VirtualView);
     }
 
     private void ConfigureButton(UIButton button)
@@ -59,6 +80,11 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
 
     protected override void DisconnectHandler(UIButton platformView)
     {
+        if (Application.Current is Application application)
+        {
+            application.RequestedThemeChanged -= OnRequestedThemeChanged;
+        }
+
         platformView.RemoveTarget(ButtonTapped, UIControlEvent.TouchUpInside);
         base.DisconnectHandler(platformView);
     }
@@ -292,9 +318,21 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
     }
 
     // Adaptive foreground used in the unselected state (dark text on light theme, light text on dark theme).
+    // The value is resolved eagerly against the theme MAUI is actually applying: the glyph is baked
+    // into a bitmap, and the ambient trait collection at render time is not necessarily the window's
+    // (it still reports the OS style while UserAppTheme overrides it), which left glyphs white in light mode.
     private static UIColor ResolveNormalColor(ToggleButton view)
     {
-        return UIColor.Label;
+        _ = view;
+        return UIColor.Label.GetResolvedColor(ResolveTraitCollection());
+    }
+
+    private static UITraitCollection ResolveTraitCollection()
+    {
+        var style = Application.Current?.RequestedTheme == AppTheme.Dark
+            ? UIUserInterfaceStyle.Dark
+            : UIUserInterfaceStyle.Light;
+        return UITraitCollection.FromUserInterfaceStyle(style);
     }
 
     // Accent color used for the selected/checked state and the highlight background.
