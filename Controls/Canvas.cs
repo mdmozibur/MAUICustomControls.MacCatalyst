@@ -6,6 +6,7 @@ namespace MAUICustomControls.MacCatalyst.Controls;
 /// A UWP-compatible coordinate layout. Children are measured without constraints,
 /// do not contribute to the Canvas desired size, and are arranged from Canvas.Left
 /// and Canvas.Top. Canvas.ZIndex is mirrored to MAUI's native z-order property.
+/// A Canvas with no Background is transparent to pointer input, as in UWP.
 /// </summary>
 [ContentProperty(nameof(Children))]
 public sealed class Canvas : Layout
@@ -43,7 +44,43 @@ public sealed class Canvas : Layout
 
     public static void SetZIndex(BindableObject element, int value) => element.SetValue(ZIndexProperty, value);
 
+    public Canvas()
+    {
+        // Only the layout itself opts out of hit testing; children keep their own input behaviour.
+        CascadeInputTransparent = false;
+        UpdateInputTransparency();
+    }
+
     protected override ILayoutManager CreateLayoutManager() => new CanvasLayoutManager(this);
+
+    protected override void OnPropertyChanged(string? propertyName = null)
+    {
+        base.OnPropertyChanged(propertyName);
+
+        if (propertyName is nameof(Background) or nameof(BackgroundColor))
+        {
+            UpdateInputTransparency();
+        }
+    }
+
+    /// <summary>
+    /// UWP hit-tests a Panel only where it actually paints: a Canvas without a Background lets
+    /// pointer input fall through to whatever sits behind it, while its children still receive
+    /// input. UIKit hit-tests a layout's view regardless of its background, so an unpainted Canvas
+    /// laid over a sibling (for example the drawing surface) would swallow every pointer, pinch and
+    /// scroll gesture. Mark the layout itself input transparent whenever it paints nothing;
+    /// CascadeInputTransparent is false, so children are unaffected.
+    /// </summary>
+    private void UpdateInputTransparency()
+    {
+        InputTransparent = PaintsNothing(Background, BackgroundColor);
+    }
+
+    private static bool PaintsNothing(Brush? background, Color? backgroundColor)
+    {
+        return Brush.IsNullOrEmpty(background) &&
+               (backgroundColor is null || backgroundColor.Alpha <= 0f);
+    }
 
     protected override void OnChildAdded(Element child)
     {
