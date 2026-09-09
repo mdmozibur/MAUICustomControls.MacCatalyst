@@ -22,6 +22,7 @@ public static class MauiProgram
                 handlers.AddHandler(typeof(Controls.PopoverButton), typeof(Platforms.MacCatalyst.PopoverButtonHandler));
                 handlers.AddHandler(typeof(Controls.ToggleButton), typeof(Platforms.MacCatalyst.ToggleButtonHandler));
                 handlers.AddHandler(typeof(Controls.ComboBox), typeof(Platforms.MacCatalyst.ComboBoxHandler));
+                handlers.AddHandler(typeof(Controls.TemplatedComboBox), typeof(Platforms.MacCatalyst.TemplatedComboBoxHandler));
                 handlers.AddHandler(typeof(Controls.ToggleDropdown), typeof(Platforms.MacCatalyst.ToggleDropdownHandler));
                 handlers.AddHandler(typeof(Controls.CheckBox), typeof(Platforms.MacCatalyst.CheckBoxHandler));
 				handlers.AddHandler(typeof(Controls.ToggleSwitch), typeof(Platforms.MacCatalyst.ToggleSwitchHandler));

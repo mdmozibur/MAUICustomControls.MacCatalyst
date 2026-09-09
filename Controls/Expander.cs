@@ -7,15 +7,18 @@ public sealed class Expander : ContentView
     private readonly ContentView _contentHost;
     private readonly Label _chevron;
 
+    // typeof(object), not typeof(View): UWP's Expander.Header is an object and is most often
+    // set to a plain string, which has no conversion to View. Strings are wrapped in a Label
+    // below. An object-typed property is also what the localization shim can write to.
     public static readonly BindableProperty HeaderProperty = BindableProperty.Create(
-        nameof(Header), typeof(View), typeof(Expander), null, propertyChanged: OnHeaderChanged);
+        nameof(Header), typeof(object), typeof(Expander), null, propertyChanged: OnHeaderChanged);
 
     public static readonly BindableProperty IsExpandedProperty = BindableProperty.Create(
         nameof(IsExpanded), typeof(bool), typeof(Expander), false, BindingMode.TwoWay, propertyChanged: OnIsExpandedChanged);
 
-    public View? Header
+    public object? Header
     {
-        get => (View?)GetValue(HeaderProperty);
+        get => GetValue(HeaderProperty);
         set => SetValue(HeaderProperty, value);
     }
 
@@ -90,10 +93,19 @@ public sealed class Expander : ContentView
 
     private static void OnHeaderChanged(BindableObject bindable, object oldValue, object newValue)
     {
-        if (bindable is Expander expander)
+        if (bindable is not Expander expander)
+            return;
+
+        expander._headerHost.Content = newValue switch
         {
-            expander._headerHost.Content = newValue as View;
-        }
+            View view => view,
+            null => null,
+            _ => new Label
+            {
+                Text = newValue.ToString(),
+                VerticalTextAlignment = TextAlignment.Center,
+            },
+        };
     }
 
     private static void OnIsExpandedChanged(BindableObject bindable, object oldValue, object newValue)
