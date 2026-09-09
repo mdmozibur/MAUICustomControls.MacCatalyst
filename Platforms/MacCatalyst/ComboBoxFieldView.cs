@@ -15,12 +15,12 @@ public sealed class ComboBoxFieldView : UIControl
 {
     private const double ChevronWidth = 14;
     private const double ChevronSpacing = 8;
-    private const double MinimumContentHeight = 22;
+    private const double MinimumContentHeight = 15;
 
     private readonly UIImageView _chevron;
     private UIView? _content;
     private bool _isOpen;
-    private UIEdgeInsets _contentInsets = new(8, 12, 8, 12);
+    private UIEdgeInsets _contentInsets = new(4,4,4,4);
 
     public ComboBoxFieldView()
     {

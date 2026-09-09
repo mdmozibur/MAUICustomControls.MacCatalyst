@@ -30,16 +30,20 @@ public sealed class CheckBoxHandler : ViewHandler<CheckBox, UIButton>
     {
         base.ConnectHandler(platformView);
 
-        // Set up the button configuration
-        var configuration = platformView.Configuration ?? UIButtonConfiguration.PlainButtonConfiguration;
-        configuration.Background.CornerRadius = 0;
-        configuration.Background.BackgroundColor = UIColor.Clear;
-        platformView.Configuration = configuration;
-
-        // Hide border and remove corner radius
+        // Deliberately no UIButtonConfiguration. A configuration recomputes the title's font and
+        // colour from itself on every update, which silently discarded everything MapFontSize and
+        // MapColor set through TitleLabel - the label rendered at UIKit's default body size
+        // instead of the size the style asked for. The legacy title path honours both.
         platformView.Layer.BorderWidth = 0;
         platformView.Layer.CornerRadius = 0;
         platformView.BackgroundColor = UIColor.Clear;
+
+        // The legacy layout butts the title straight up against the box glyph. Nudge it across
+        // and give the content the width back, which is what the configuration's imagePadding
+        // used to do.
+        const int glyphGap = 6;
+        platformView.TitleEdgeInsets = new UIEdgeInsets(0, glyphGap, 0, -glyphGap);
+        platformView.ContentEdgeInsets = new UIEdgeInsets(0, 0, 0, glyphGap);
         platformView.HorizontalAlignment = ToggleDropdownHandler.ResolveContentHorizontalAlignment(VirtualView.HorizontalContentAlignment);
         
         // Use the proper event to handle selection changes
@@ -100,7 +104,12 @@ public sealed class CheckBoxHandler : ViewHandler<CheckBox, UIButton>
     
     public static void MapColor(CheckBoxHandler handler, CheckBox view)
     {
-        handler.PlatformView.SetTitleColor(ResolveBrushColor(view.Foreground, global::Microsoft.Maui.Graphics.Colors.DodgerBlue.ToPlatform()), UIControlState.Normal);
+        // UIColor.Label, not an accent: a check box's caption is body text.
+        var color = ResolveBrushColor(view.Foreground, UIColor.Label);
+        handler.PlatformView.SetTitleColor(color, UIControlState.Normal);
+
+        // The box glyph is an SF Symbol, which would otherwise take the button's tint.
+        handler.PlatformView.TintColor = color;
     }
 
     private static UIColor ResolveBrushColor(global::Microsoft.Maui.Controls.SolidColorBrush? brush, UIColor fallbackColor)

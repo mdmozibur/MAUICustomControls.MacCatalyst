@@ -57,13 +57,18 @@ public sealed class CheckBox : ContentView
         set => SetValue(FontAttributesProperty, value);
     }
 
-    public SolidColorBrush Foreground
+    public SolidColorBrush? Foreground
     {
-        get => (SolidColorBrush)GetValue(ForegroundProperty);
+        get => (SolidColorBrush?)GetValue(ForegroundProperty);
         set => SetValue(ForegroundProperty, value);
     }
+    /// <summary>Colour for the caption and the box glyph; null follows the platform label colour.</summary>
+    /// <remarks>
+    /// Null rather than a concrete default: a fixed colour here would override the theme in both
+    /// light and dark, and a check box caption is body text, not an accent.
+    /// </remarks>
     public static readonly BindableProperty ForegroundProperty =
-        BindableProperty.Create(nameof(Foreground), typeof(SolidColorBrush), typeof(CheckBox), Brush.DodgerBlue);
+        BindableProperty.Create(nameof(Foreground), typeof(SolidColorBrush), typeof(CheckBox), null);
 
     public LayoutOptions HorizontalContentAlignment
     {

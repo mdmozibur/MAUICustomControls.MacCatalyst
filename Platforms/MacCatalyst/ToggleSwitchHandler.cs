@@ -14,6 +14,7 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
         [nameof(ToggleSwitch.Text)] = MapText,
         [nameof(ToggleSwitch.FontSize)] = MapFontSize,
         [nameof(ToggleSwitch.Padding)] = MapPadding,
+        [nameof(ToggleSwitch.SwitchScale)] = MapSwitchScale,
         [nameof(ToggleSwitch.IsOn)] = MapIsOn,
         [nameof(ToggleSwitch.Foreground)] = MapForeground,
         [nameof(ToggleSwitch.OnColor)] = MapOnColor,
@@ -37,6 +38,7 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
         MapText(this, VirtualView);
         MapFontSize(this, VirtualView);
         MapPadding(this, VirtualView);
+        MapSwitchScale(this, VirtualView);
         MapIsOn(this, VirtualView);
         MapForeground(this, VirtualView);
         MapOnColor(this, VirtualView);
@@ -87,6 +89,11 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
         handler.PlatformView.SetNeedsLayout();
     }
 
+    public static void MapSwitchScale(ToggleSwitchHandler handler, ToggleSwitch view)
+    {
+        handler.PlatformView.SwitchScale = (nfloat)view.SwitchScale;
+    }
+
     public static void MapIsOn(ToggleSwitchHandler handler, ToggleSwitch view)
     {
         if (handler.PlatformView.SwitchControl.On != view.IsOn)
@@ -127,7 +134,39 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
         private static readonly nfloat Spacing = 12;
         internal const double MeasurementLimit = 10000;
 
+        private nfloat _switchScale = 1;
+
         public Thickness Padding { get; set; }
+
+        /// <summary>
+        /// Uniform scale for the switch. Applied as a transform, since UISwitch has a fixed
+        /// intrinsic size and ignores its frame.
+        /// </summary>
+        public nfloat SwitchScale
+        {
+            get => _switchScale;
+            set
+            {
+                _switchScale = value > 0 ? value : 1;
+                SwitchControl.Transform = CGAffineTransform.MakeScale(_switchScale, _switchScale);
+                InvalidateIntrinsicContentSize();
+                SetNeedsLayout();
+            }
+        }
+
+        /// <summary>The switch's natural size, before the scale transform.</summary>
+        private CGSize NaturalSwitchSize =>
+            SwitchControl.SizeThatFits(new CGSize((nfloat)MeasurementLimit, (nfloat)MeasurementLimit));
+
+        /// <summary>The footprint the switch actually occupies once scaled.</summary>
+        private CGSize ScaledSwitchSize
+        {
+            get
+            {
+                var natural = NaturalSwitchSize;
+                return new CGSize(natural.Width * _switchScale, natural.Height * _switchScale);
+            }
+        }
 
         public UILabel TextLabel { get; } = new()
         {
@@ -151,7 +190,7 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
         public override CGSize SizeThatFits(CGSize size)
         {
             var padding = GetPadding();
-            var switchSize = SwitchControl.SizeThatFits(new CGSize((nfloat)MeasurementLimit, (nfloat)MeasurementLimit));
+            var switchSize = ScaledSwitchSize;
             var spacing = GetSpacing();
             var unconstrainedLabelSize = MeasureLabel((nfloat)MeasurementLimit);
             var contentWidthLimit = size.Width > 0 && size.Width < MeasurementLimit
@@ -188,25 +227,30 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
             var padding = GetPadding();
             var contentWidth = (nfloat)Math.Max(0, layoutSize.Width - padding.Left - padding.Right);
             var contentHeight = (nfloat)Math.Max(0, layoutSize.Height - padding.Top - padding.Bottom);
-            var switchSize = SwitchControl.SizeThatFits(layoutSize);
+            var switchSize = ScaledSwitchSize;
             var spacing = GetSpacing();
-            var switchX = padding.Left + (nfloat)Math.Max(0, contentWidth - switchSize.Width);
-            var labelMaxWidth = (nfloat)Math.Max(0, switchX - spacing);
-            labelMaxWidth = (nfloat)Math.Max(0, labelMaxWidth - padding.Left);
+            // Switch first, caption after it: UWP's ToggleSwitch template puts the track in the
+            // leading column and its content in the trailing one, so a caption written for that
+            // layout reads as a label for the switch on its left.
+            var switchX = padding.Left;
+            var labelX = switchX + switchSize.Width + spacing;
+            var labelMaxWidth = (nfloat)Math.Max(0, padding.Left + contentWidth - labelX);
             var labelSize = MeasureLabel(labelMaxWidth);
             var contentTop = padding.Top;
 
+            // Bounds plus Center, not Frame: UIKit leaves Frame undefined for a view carrying a
+            // non-identity transform, so the switch is given its natural bounds and placed by its
+            // centre inside the space the scaled size reserved for it.
+            SwitchControl.Bounds = new CGRect(CGPoint.Empty, NaturalSwitchSize);
+            SwitchControl.Center = new CGPoint(
+                switchX + (switchSize.Width / 2),
+                contentTop + (contentHeight / 2));
+
             TextLabel.Frame = new CGRect(
-                padding.Left,
+                labelX,
                 contentTop + (contentHeight - labelSize.Height) / 2,
                 labelMaxWidth,
                 labelSize.Height);
-
-            SwitchControl.Frame = new CGRect(
-                switchX,
-                contentTop + (contentHeight - switchSize.Height) / 2,
-                switchSize.Width,
-                switchSize.Height);
         }
 
         private CGSize MeasureLabel(nfloat width)

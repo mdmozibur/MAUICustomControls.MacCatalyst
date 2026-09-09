@@ -82,7 +82,7 @@ public sealed class TemplatedComboBox : View
     /// converted UWP views ask for with CornerRadius="0".
     /// </summary>
     public static readonly BindableProperty CornerRadiusProperty =
-        BindableProperty.Create(nameof(CornerRadius), typeof(double), typeof(TemplatedComboBox), 8d);
+        BindableProperty.Create(nameof(CornerRadius), typeof(double), typeof(TemplatedComboBox), 0d);
 
     public static readonly BindableProperty PaddingProperty =
         BindableProperty.Create(nameof(Padding), typeof(Thickness), typeof(TemplatedComboBox),
