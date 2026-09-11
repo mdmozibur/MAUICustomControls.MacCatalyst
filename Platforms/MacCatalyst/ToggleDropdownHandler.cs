@@ -419,7 +419,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
             ?? throw new InvalidOperationException("Unable to resolve the system font.");
     }
 
-    private static UIFont? ResolvePlatformFont(string fontFamily, nfloat fontSize)
+    internal static UIFont? ResolvePlatformFont(string fontFamily, nfloat fontSize)
     {
         var font = UIFont.FromName(fontFamily, fontSize);
         if (font is not null)

@@ -30,9 +30,29 @@ public sealed class SegmentedButtonItem : BindableObject
         set => SetValue(IconProperty, value);
     }
 
-    internal string GetDisplayText()
+    internal string GetContentText()
     {
-        return GetText(Content) ?? GetText(Icon) ?? string.Empty;
+        return GetText(Content) ?? string.Empty;
+    }
+
+    /// <summary>The icon's glyph and the icon font it is drawn with, if the item has an icon.</summary>
+    internal string? GetIconGlyph(out string? fontFamily)
+    {
+        switch (Icon)
+        {
+            case Label label:
+                fontFamily = label.FontFamily;
+                return label.Text;
+            case FontImageSource fontImage:
+                fontFamily = fontImage.FontFamily;
+                return fontImage.Glyph;
+            case string glyph:
+                fontFamily = null;
+                return glyph;
+            default:
+                fontFamily = null;
+                return null;
+        }
     }
 
     private static string? GetText(object? value)

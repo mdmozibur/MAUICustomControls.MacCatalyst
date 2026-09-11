@@ -1,3 +1,4 @@
+using CoreGraphics;
 using Foundation;
 using MAUICustomControls.MacCatalyst.Controls;
 using Microsoft.Maui.Handlers;
@@ -9,6 +10,7 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst;
 public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UIStackView>
 {
     private const int NoSelectedSegment = -1;
+    private const double IconTextSpacing = 6;
 
     private UILabel? _headerLabel;
     private UISegmentedControl? _segmentedControl;
@@ -70,6 +72,40 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
         base.DisconnectHandler(platformView);
     }
 
+    public override Size GetDesiredSize(double widthConstraint, double heightConstraint)
+    {
+        if (_segmentedControl is null || _headerLabel is null)
+        {
+            return base.GetDesiredSize(widthConstraint, heightConstraint);
+        }
+
+        // UIStackView sizes itself through Auto Layout, not SizeThatFits, which is what MAUI's default
+        // measure asks - so the control measured as empty and was never shown. Measure the parts.
+        var segments = _segmentedControl.IntrinsicContentSize;
+        double width = segments.Width;
+        double height = segments.Height;
+
+        if (!_headerLabel.Hidden)
+        {
+            var headerWidthLimit = double.IsInfinity(widthConstraint) ? nfloat.MaxValue : (nfloat)widthConstraint;
+            var header = _headerLabel.SizeThatFits(new CGSize(headerWidthLimit, nfloat.MaxValue));
+            width = Math.Max(width, header.Width);
+            height += header.Height + PlatformView.Spacing;
+        }
+
+        if (VirtualView.WidthRequest >= 0)
+        {
+            width = VirtualView.WidthRequest;
+        }
+
+        if (VirtualView.HeightRequest >= 0)
+        {
+            height = VirtualView.HeightRequest;
+        }
+
+        return new Size(Math.Ceiling(Math.Min(width, widthConstraint)), Math.Ceiling(Math.Min(height, heightConstraint)));
+    }
+
     private static void MapItems(SegmentedButtonsHandler handler, SegmentedButtons control)
     {
         if (handler._segmentedControl is null)
@@ -80,10 +116,25 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
         handler._segmentedControl.RemoveAllSegments();
         for (var index = 0; index < control.Items.Count; index++)
         {
-            handler._segmentedControl.InsertSegment(control.Items[index].GetDisplayText(), index, false);
+            var item = control.Items[index];
+            var text = item.GetContentText();
+            var glyph = item.GetIconGlyph(out var iconFontFamily);
+
+            if (string.IsNullOrEmpty(glyph))
+            {
+                handler._segmentedControl.InsertSegment(text, index, false);
+            }
+            else
+            {
+                handler._segmentedControl.InsertSegment(
+                    CreateIconSegmentImage(glyph, iconFontFamily, text, (nfloat)control.FontSize), index, false);
+            }
         }
 
         MapSelectedIndex(handler, control);
+
+        // Item text often arrives after the first measure (x:Uid localization sets it later).
+        ((IView)control).InvalidateMeasure();
     }
 
     private static void MapHeader(SegmentedButtonsHandler handler, SegmentedButtons control)
@@ -98,6 +149,8 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
         handler._headerLabel.Font = UIFont.SystemFontOfSize((nfloat)control.FontSize, UIFontWeight.Semibold)!;
         handler._headerLabel.TextColor = control.TextColor.ToPlatform();
         handler._headerLabel.Hidden = string.IsNullOrWhiteSpace(header);
+
+        ((IView)control).InvalidateMeasure();
     }
 
     private static void MapSelectedIndex(SegmentedButtonsHandler handler, SegmentedButtons control)
@@ -134,6 +187,9 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
             UIControlState.Selected);
 
         MapHeader(handler, control);
+
+        // Icon segments are drawn at the font size.
+        MapItems(handler, control);
     }
 
     private static void MapTintColor(SegmentedButtonsHandler handler, SegmentedButtons control)
@@ -142,6 +198,45 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
         {
             handler._segmentedControl.SelectedSegmentTintColor = control.TintColor.ToPlatform();
         }
+    }
+
+    /// <summary>
+    /// Draws an item's icon glyph and label into one template image.
+    /// </summary>
+    /// <remarks>
+    /// UWP's SegmentedButtonItem shows the icon next to the text. A UISegmentedControl segment holds
+    /// either a title or an image, and the glyph lives in the app's icon font, which a title cannot mix
+    /// with the system font.
+    /// </remarks>
+    private static UIImage CreateIconSegmentImage(string glyph, string? iconFontFamily, string text, nfloat fontSize)
+    {
+        var iconFont = (string.IsNullOrEmpty(iconFontFamily) ? null : ToggleDropdownHandler.ResolvePlatformFont(iconFontFamily, fontSize))
+            ?? UIFont.SystemFontOfSize(fontSize);
+        var icon = new NSAttributedString(glyph, new UIStringAttributes { Font = iconFont, ForegroundColor = UIColor.Black });
+        var label = new NSAttributedString(text, new UIStringAttributes { Font = UIFont.SystemFontOfSize(fontSize), ForegroundColor = UIColor.Black });
+
+        var hasText = text.Length > 0;
+        var iconSize = icon.Size;
+        var labelSize = hasText ? label.Size : CGSize.Empty;
+        var spacing = hasText ? IconTextSpacing : 0;
+        var imageSize = new CGSize(
+            Math.Ceiling(iconSize.Width + spacing + labelSize.Width),
+            Math.Ceiling(Math.Max(iconSize.Height, labelSize.Height)));
+
+        var image = new UIGraphicsImageRenderer(imageSize).CreateImage(_ =>
+        {
+            icon.DrawString(new CGPoint(0, (imageSize.Height - iconSize.Height) / 2));
+
+            if (hasText)
+            {
+                label.DrawString(new CGPoint(iconSize.Width + spacing, (imageSize.Height - labelSize.Height) / 2));
+            }
+        });
+
+        // A template image is tinted by the control for its normal and selected states.
+        var segmentImage = image.ImageWithRenderingMode(UIImageRenderingMode.AlwaysTemplate);
+        segmentImage.AccessibilityLabel = hasText ? text : glyph;
+        return segmentImage;
     }
 
     private void OnValueChanged(object? sender, EventArgs e)
