@@ -30,6 +30,7 @@ public static class MauiProgram
                 handlers.AddHandler(typeof(Controls.SegmentedButtons), typeof(Platforms.MacCatalyst.SegmentedButtonsHandler));
                 handlers.AddHandler(typeof(Controls.AnimatedVisualPlayer), typeof(Platforms.MacCatalyst.AnimatedVisualPlayerHandler));
                 handlers.AddHandler(typeof(Controls.Canvas), typeof(Platforms.MacCatalyst.CanvasHandler));
+                handlers.AddHandler(typeof(Controls.ColorWell), typeof(Platforms.MacCatalyst.ColorWellHandler));
 
                 Platforms.MacCatalyst.EntryHandlerCustomization.Configure();
 #endif

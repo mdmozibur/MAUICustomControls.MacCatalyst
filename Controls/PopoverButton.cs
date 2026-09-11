@@ -116,6 +116,36 @@ public sealed class PopoverButton : ContentView
 		set => SetValue(PopoverDirectionProperty, value);
 	}
 
+	public static readonly BindableProperty PopoverCornerRadiusProperty =
+		BindableProperty.Create(nameof(PopoverCornerRadius), typeof(double), typeof(PopoverButton), 4d);
+
+	/// <summary>Corner radius of the popover bubble; 0 gives square corners.</summary>
+	public double PopoverCornerRadius
+	{
+		get => (double)GetValue(PopoverCornerRadiusProperty);
+		set => SetValue(PopoverCornerRadiusProperty, value);
+	}
+
+	public static readonly BindableProperty ShowPopoverArrowProperty =
+		BindableProperty.Create(nameof(ShowPopoverArrow), typeof(bool), typeof(PopoverButton), true);
+
+	/// <summary>Whether the popover draws an arrow pointing at the button.</summary>
+	public bool ShowPopoverArrow
+	{
+		get => (bool)GetValue(ShowPopoverArrowProperty);
+		set => SetValue(ShowPopoverArrowProperty, value);
+	}
+
+	public static readonly BindableProperty PopoverPaddingProperty =
+		BindableProperty.Create(nameof(PopoverPadding), typeof(Thickness), typeof(PopoverButton), new Thickness(8));
+
+	/// <summary>Space between the popover bubble and its content.</summary>
+	public Thickness PopoverPadding
+	{
+		get => (Thickness)GetValue(PopoverPaddingProperty);
+		set => SetValue(PopoverPaddingProperty, value);
+	}
+
 	public new object? Content
 	{
 		get => _contentModel;

@@ -1,3 +1,5 @@
+using CoreFoundation;
+using CoreGraphics;
 using Microsoft.Maui.Handlers;
 using Microsoft.Maui.Platform;
 using MAUICustomControls.MacCatalyst.Controls;
@@ -8,8 +10,16 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
     public sealed class PopoverButtonHandler : ContentViewHandler
     {
         private UITapGestureRecognizer? _tapGestureRecognizer;
-        private PopoverDelegate? _popoverDelegate;
-        private WeakReference<UIViewController>? _popoverController;
+
+        // Built on first open and reused afterwards, so reopening does not rebuild the
+        // content's native views. Released when the handler disconnects.
+        private PopoverHostViewController? _popoverController;
+        private Microsoft.Maui.Controls.View? _popoverControllerContent;
+
+        // Held in a field: TransitioningDelegate is a weak reference on the ObjC side.
+        private PopoverTransitioningDelegate? _transitioningDelegate;
+        private bool _isDismissing;
+        private bool _contentSizeUpdatePending;
 
         public static PropertyMapper<PopoverButton, PopoverButtonHandler> PropertyMapper = new(ViewMapper)
         {
@@ -22,6 +32,8 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
         {
         }
 
+        private bool IsPopoverPresented => _popoverController?.PresentingViewController is not null;
+
         protected override void ConnectHandler(Microsoft.Maui.Platform.ContentView platformView)
         {
             base.ConnectHandler(platformView);
@@ -31,7 +43,7 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
 
             if (VirtualView is PopoverButton popoverButton)
             {
-                popoverButton.HidePopoverAction = HideActivePopover;
+                popoverButton.HidePopoverAction = () => HideActivePopover(animated: true);
             }
         }
 
@@ -49,7 +61,8 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
                 _tapGestureRecognizer = null;
             }
 
-            HideActivePopover();
+            HideActivePopover(animated: false);
+            ReleasePopoverController();
             base.DisconnectHandler(platformView);
         }
 
@@ -57,9 +70,9 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
         {
             handler.PlatformView.Layer.BorderColor = popoverButton.BorderColor.ToCGColor();
             handler.PlatformView.Layer.BorderWidth = (nfloat)popoverButton.BorderWidth;
-            // handler.PlatformView.Layer.CornerRadius = popoverButton.CornerRadius.TopLeft; 
+            // handler.PlatformView.Layer.CornerRadius = popoverButton.CornerRadius.TopLeft;
         }
-        
+
         private void OnTapped()
         {
             if (VirtualView is not PopoverButton popoverButton)
@@ -71,108 +84,131 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
             if (presentedContent == null)
                 return;
 
-            if (TryGetActivePopover(out var activePopover))
+            if (IsPopoverPresented)
             {
-                activePopover.DismissViewController(true, CleanupPopover);
+                HideActivePopover(animated: true);
                 return;
             }
 
+            var presentingController = GetPresentingViewController();
+            if (presentingController is null)
+                return;
+
             popoverButton.RaiseOpening();
 
-            var popoverContent = presentedContent;
+            var controller = GetOrCreatePopoverController(presentedContent);
+            UpdatePreferredContentSize(controller, presentedContent, popoverButton.PopoverPadding);
+
+            controller.ModalPresentationStyle = UIModalPresentationStyle.Custom;
+            _transitioningDelegate = new PopoverTransitioningDelegate(
+                PlatformView,
+                popoverButton.PopoverDirection,
+                new PopoverChromeOptions(popoverButton.PopoverCornerRadius, popoverButton.ShowPopoverArrow, popoverButton.PopoverPadding),
+                onOutsideTap: () => HideActivePopover(animated: true));
+            controller.TransitioningDelegate = _transitioningDelegate;
+
+            _isDismissing = false;
+
+            // Opened is raised once the popover is on screen, as UWP's Flyout does. Raising it
+            // before presenting ran its handlers (e.g. a canvas redraw) ahead of the animation.
+            presentingController.PresentViewController(controller, true, () => popoverButton.RaiseOpened());
+        }
+
+        private PopoverHostViewController GetOrCreatePopoverController(Microsoft.Maui.Controls.View content)
+        {
+            if (_popoverController is not null && ReferenceEquals(_popoverControllerContent, content))
+                return _popoverController;
+
+            ReleasePopoverController();
+
             var mauiContext = MauiContext ?? throw new InvalidOperationException("MauiContext is null");
+            _popoverController = new PopoverHostViewController(
+                content.ToPlatform(mauiContext),
+                onEscape: () => HideActivePopover(animated: true));
+            _popoverControllerContent = content;
+            content.MeasureInvalidated += PopoverContent_MeasureInvalidated;
 
-            var viewController = new UIViewController
-            {
-                ModalPresentationStyle = UIModalPresentationStyle.Popover,
-                View = popoverContent.ToPlatform(mauiContext)
-            };
-            var measure = popoverContent.Measure(double.PositiveInfinity, double.PositiveInfinity);
-            viewController.PreferredContentSize = new CoreGraphics.CGSize(Math.Max(1, measure.Width), Math.Max(1, measure.Height));
-            _popoverController = new WeakReference<UIViewController>(viewController);
-
-            var popover = viewController.PopoverPresentationController;
-            if (popover != null)
-            {
-                popover.SourceView = PlatformView;
-                popover.SourceRect = PlatformView.Bounds.IsEmpty ? new CoreGraphics.CGRect(0, 0, PlatformView.Frame.Width, PlatformView.Frame.Height) : PlatformView.Bounds;
-                popover.PermittedArrowDirections = popoverButton.PopoverDirection switch
-                {
-                    PopoverDirection.Up => UIPopoverArrowDirection.Down,
-                    PopoverDirection.Down => UIPopoverArrowDirection.Up,
-                    PopoverDirection.Left => UIPopoverArrowDirection.Right,
-                    PopoverDirection.Right => UIPopoverArrowDirection.Left,
-                    _ => UIPopoverArrowDirection.Any
-                };
-
-                _popoverDelegate = new PopoverDelegate(this);
-                popover.Delegate = _popoverDelegate;
-            }
-
-            var presentingController = GetPresentingViewController();
-            presentingController?.PresentViewController(viewController, true, null);
-            popoverButton.RaiseOpened();
+            return _popoverController;
         }
 
-        internal void CleanupPopover()
+        private void ReleasePopoverController()
         {
-            if (VirtualView is PopoverButton popoverButton)
+            if (_popoverControllerContent is not null)
             {
-                if (popoverButton.PopoverContent?.Handler is not null)
-                {
-                    popoverButton.PopoverContent.Handler.DisconnectHandler();
-                }
-
-                popoverButton.RaiseClosed();
+                _popoverControllerContent.MeasureInvalidated -= PopoverContent_MeasureInvalidated;
+                _popoverControllerContent.Handler?.DisconnectHandler();
             }
 
-            _popoverDelegate = null;
+            _popoverControllerContent = null;
             _popoverController = null;
+            _transitioningDelegate = null;
         }
 
-        private void HideActivePopover()
+        private static void UpdatePreferredContentSize(UIViewController controller, Microsoft.Maui.Controls.View content, Thickness padding)
         {
-            if (TryGetActivePopover(out var controller))
-            {
-                controller.DismissViewController(true, CleanupPopover);
-            }
+            // The unconstrained pass only settles the width. Arranged at that width, star columns
+            // split it evenly and text can wrap (e.g. "From color book" in SCColorChooser), so the
+            // height has to come from a second pass at the final width.
+            var width = Math.Ceiling(content.Measure(double.PositiveInfinity, double.PositiveInfinity).Width);
+            var height = Math.Ceiling(content.Measure(width, double.PositiveInfinity).Height);
+            var size = new CGSize(
+                Math.Max(1, width + padding.HorizontalThickness),
+                Math.Max(1, height + padding.VerticalThickness));
+
+            if (controller.PreferredContentSize != size)
+                controller.PreferredContentSize = size;
         }
 
-        private bool TryGetActivePopover(out UIViewController controller)
+        private void PopoverContent_MeasureInvalidated(object? sender, EventArgs e)
         {
-            if (_popoverController != null && _popoverController.TryGetTarget(out var currentController) && currentController.PresentingViewController != null)
-            {
-                controller = currentController;
-                return true;
-            }
+            if (_contentSizeUpdatePending || !IsPopoverPresented)
+                return;
 
-            controller = null!;
-            return false;
-        }
-
-        private static UIViewController? GetPresentingViewController()
-        {
-            foreach (var scene in UIApplication.SharedApplication.ConnectedScenes.OfType<UIWindowScene>())
+            // A single visibility change invalidates every ancestor; re-measure once for the burst.
+            _contentSizeUpdatePending = true;
+            DispatchQueue.MainQueue.DispatchAsync(() =>
             {
-                var window = scene.Windows.FirstOrDefault(candidate => candidate.IsKeyWindow) ?? scene.Windows.FirstOrDefault();
-                if (window?.RootViewController is UIViewController rootViewController)
+                _contentSizeUpdatePending = false;
+
+                if (IsPopoverPresented
+                    && _popoverController is { } controller
+                    && _popoverControllerContent is { } content
+                    && VirtualView is PopoverButton popoverButton)
                 {
-                    return GetTopViewController(rootViewController);
+                    UpdatePreferredContentSize(controller, content, popoverButton.PopoverPadding);
                 }
-            }
-
-            return null;
+            });
         }
 
-        private static UIViewController GetTopViewController(UIViewController controller)
+        private void HideActivePopover(bool animated)
         {
-            var current = controller;
-            while (current.PresentedViewController is UIViewController presented)
-            {
-                current = presented;
-            }
+            if (_isDismissing || _popoverController is not { PresentingViewController: not null } controller)
+                return;
 
-            return current;
+            _isDismissing = true;
+            controller.DismissViewController(animated, OnPopoverDismissed);
+        }
+
+        private void OnPopoverDismissed()
+        {
+            _isDismissing = false;
+            _transitioningDelegate = null;
+            (VirtualView as PopoverButton)?.RaiseClosed();
+        }
+
+        private UIViewController? GetPresentingViewController()
+        {
+            var window = PlatformView.Window ?? UIApplication.SharedApplication.ConnectedScenes
+                .OfType<UIWindowScene>()
+                .SelectMany(scene => scene.Windows)
+                .FirstOrDefault(candidate => candidate.IsKeyWindow);
+
+            var controller = window?.RootViewController;
+
+            while (controller?.PresentedViewController is not null)
+                controller = controller.PresentedViewController;
+
+            return controller;
         }
     }
 }
