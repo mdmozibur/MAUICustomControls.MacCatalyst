@@ -130,11 +130,11 @@ public sealed class SegmentedButtons : View
         typeof(SegmentedButtons),
         13d);
 
+    // Null means "follow the theme": the handler falls back to the dynamic label colour.
     public static readonly BindableProperty TextColorProperty = BindableProperty.Create(
         nameof(TextColor),
         typeof(Color),
-        typeof(SegmentedButtons),
-        Colors.Black);
+        typeof(SegmentedButtons));
 
     public static readonly BindableProperty SelectedTextColorProperty = BindableProperty.Create(
         nameof(SelectedTextColor),
@@ -178,9 +178,9 @@ public sealed class SegmentedButtons : View
         set => SetValue(FontSizeProperty, value);
     }
 
-    public Color TextColor
+    public Color? TextColor
     {
-        get => (Color)GetValue(TextColorProperty);
+        get => (Color?)GetValue(TextColorProperty);
         set => SetValue(TextColorProperty, value);
     }
 

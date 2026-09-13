@@ -147,7 +147,7 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
         var header = control.GetHeaderText();
         handler._headerLabel.Text = header;
         handler._headerLabel.Font = UIFont.SystemFontOfSize((nfloat)control.FontSize, UIFontWeight.Semibold)!;
-        handler._headerLabel.TextColor = control.TextColor.ToPlatform();
+        handler._headerLabel.TextColor = ResolveTextColor(control);
         handler._headerLabel.Hidden = string.IsNullOrWhiteSpace(header);
 
         ((IView)control).InvalidateMeasure();
@@ -175,7 +175,7 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
             new UIStringAttributes
             {
                 Font = font,
-                ForegroundColor = control.TextColor.ToPlatform(),
+                ForegroundColor = ResolveTextColor(control),
             },
             UIControlState.Normal);
         handler._segmentedControl.SetTitleTextAttributes(
@@ -190,6 +190,13 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
 
         // Icon segments are drawn at the font size.
         MapItems(handler, control);
+    }
+
+    // UIColor.Label, not a fixed colour: it is dynamic, so the header and unselected titles follow
+    // the light/dark theme. A fixed default (it used to be black) left them unreadable in dark mode.
+    private static UIColor ResolveTextColor(SegmentedButtons control)
+    {
+        return control.TextColor?.ToPlatform() ?? UIColor.Label;
     }
 
     private static void MapTintColor(SegmentedButtonsHandler handler, SegmentedButtons control)
