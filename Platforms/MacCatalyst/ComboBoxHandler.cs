@@ -9,6 +9,7 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, UIButton>
 {
     public static PropertyMapper<ComboBox, ComboBoxHandler> PropertyMapper = new(ViewMapper)
     {
+        ["UseSystemFocusVisuals"] = (handler, view) => FocusRing.UpdateSystemControl(handler.PlatformView, view),
         [nameof(ComboBox.UnselectedText)] = MapText,
         [nameof(ComboBox.BorderThickness)] = MapText,
         [nameof(ComboBox.Options)] = VirtualView_Options_CollectionChanged,
@@ -57,6 +58,7 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, UIButton>
     {
         var button = new UIButton(UIButtonType.System);
         button.ShowsMenuAsPrimaryAction = true;
+        MacIdiomControlStyle.Apply(button);
         return button;
     }
 

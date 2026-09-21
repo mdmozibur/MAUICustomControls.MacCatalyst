@@ -22,6 +22,7 @@ public sealed partial class ToggleDropdown : ContentView
         set => SetValue(IsCheckedProperty, value);
     }
 
+    // Accent used for the icon and label while the dropdown is checked (the UWP "Checked" state).
     public Color TintColor
     {
         get => (Color)GetValue(TintColorProperty);
@@ -29,6 +30,50 @@ public sealed partial class ToggleDropdown : ContentView
     }
     public static readonly BindableProperty TintColorProperty =
         BindableProperty.Create(nameof(TintColor), typeof(Color), typeof(ToggleDropdown), Colors.DodgerBlue);
+
+    // Icon and label colour while unchecked. Null follows the system label colour, so it tracks light/dark.
+    public Color? TextColor
+    {
+        get => (Color?)GetValue(TextColorProperty);
+        set => SetValue(TextColorProperty, value);
+    }
+    public static readonly BindableProperty TextColorProperty =
+        BindableProperty.Create(nameof(TextColor), typeof(Color), typeof(ToggleDropdown), null);
+
+    // Null follows the system separator colour.
+    public Color? BorderColor
+    {
+        get => (Color?)GetValue(BorderColorProperty);
+        set => SetValue(BorderColorProperty, value);
+    }
+    public static readonly BindableProperty BorderColorProperty =
+        BindableProperty.Create(nameof(BorderColor), typeof(Color), typeof(ToggleDropdown), null);
+
+    public double CornerRadius
+    {
+        get => (double)GetValue(CornerRadiusProperty);
+        set => SetValue(CornerRadiusProperty, value);
+    }
+    public static readonly BindableProperty CornerRadiusProperty =
+        BindableProperty.Create(nameof(CornerRadius), typeof(double), typeof(ToggleDropdown), 0.0);
+
+    // Small marker drawn at the trailing edge while checked, signalling that a click opens the
+    // option menu. Empty glyph/font falls back to an SF Symbol chevron.
+    public string DropdownIndicatorGlyph
+    {
+        get => (string)GetValue(DropdownIndicatorGlyphProperty);
+        set => SetValue(DropdownIndicatorGlyphProperty, value);
+    }
+    public static readonly BindableProperty DropdownIndicatorGlyphProperty =
+        BindableProperty.Create(nameof(DropdownIndicatorGlyph), typeof(string), typeof(ToggleDropdown), string.Empty);
+
+    public string DropdownIndicatorFontFamily
+    {
+        get => (string)GetValue(DropdownIndicatorFontFamilyProperty);
+        set => SetValue(DropdownIndicatorFontFamilyProperty, value);
+    }
+    public static readonly BindableProperty DropdownIndicatorFontFamilyProperty =
+        BindableProperty.Create(nameof(DropdownIndicatorFontFamily), typeof(string), typeof(ToggleDropdown), string.Empty);
 
     public LayoutOptions HorizontalContentAlignment
     {
@@ -44,7 +89,7 @@ public sealed partial class ToggleDropdown : ContentView
         set => SetValue(BorderThicknessProperty, value);
     }
     public static readonly BindableProperty BorderThicknessProperty =
-        BindableProperty.Create(nameof(BorderThickness), typeof(double), typeof(ToggleDropdown), 1.0);
+        BindableProperty.Create(nameof(BorderThickness), typeof(double), typeof(ToggleDropdown), 0.0);
 
     public static readonly BindableProperty UnselectedTextProperty =
         BindableProperty.Create(nameof(UnselectedText), typeof(string), typeof(ToggleDropdown), string.Empty);

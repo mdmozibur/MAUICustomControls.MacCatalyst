@@ -1,8 +1,11 @@
 using System;
+using System.Linq;
 using Microsoft.Maui;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Graphics;
 #if MACCATALYST
+using CoreAnimation;
+using CoreGraphics;
 using Microsoft.Maui.Platform;
 using UIKit;
 #endif
@@ -21,6 +24,10 @@ namespace MAUICustomControls.MacCatalyst.Controls;
 /// </remarks>
 internal static class BorderedLayoutChrome
 {
+#if MACCATALYST
+    private const string BorderLayerName = "UwpPanelBorder";
+#endif
+
     public static void Apply(VisualElement element, Brush? borderBrush, Thickness borderThickness, CornerRadius cornerRadius)
     {
 #if MACCATALYST
@@ -29,21 +36,72 @@ internal static class BorderedLayoutChrome
             return;
         }
 
-        var thickness = Math.Max(
-            Math.Max(borderThickness.Left, borderThickness.Top),
-            Math.Max(borderThickness.Right, borderThickness.Bottom));
+        var layer = platformView.Layer;
         var radius = Math.Max(
             Math.Max(cornerRadius.TopLeft, cornerRadius.TopRight),
             Math.Max(cornerRadius.BottomLeft, cornerRadius.BottomRight));
 
-        platformView.Layer.BorderWidth = (nfloat)Math.Max(0, thickness);
-        platformView.Layer.BorderColor = borderBrush is SolidColorBrush solidBrush
-            ? solidBrush.Color.ToCGColor()
-            : Colors.Transparent.ToCGColor();
-        platformView.Layer.CornerRadius = (nfloat)Math.Max(0, radius);
-        platformView.Layer.MasksToBounds = radius > 0;
+        // UWP rounds the background and the border, not the children, so nothing is clipped.
+        // Corners without a radius stay square (a segmented "4,0,0,4" panel).
+        layer.CornerRadius = (nfloat)Math.Max(0, radius);
+        layer.MaskedCorners = radius > 0 ? GetRoundedCorners(cornerRadius) : AllCorners;
+        layer.MasksToBounds = false;
+
+        var color = (borderBrush as SolidColorBrush)?.Color;
+        var borderLayer = layer.Sublayers?.OfType<CAShapeLayer>().FirstOrDefault(sublayer => sublayer.Name == BorderLayerName);
+        var hasBorder = color is not null &&
+            (borderThickness.Left > 0 || borderThickness.Top > 0 || borderThickness.Right > 0 || borderThickness.Bottom > 0);
+
+        if (!hasBorder || IsUniform(borderThickness))
+        {
+            // One width all round: the layer's own border, which follows the corner radius.
+            borderLayer?.RemoveFromSuperLayer();
+            layer.BorderWidth = hasBorder ? (nfloat)borderThickness.Left : 0;
+            layer.BorderColor = hasBorder ? color!.ToCGColor() : null;
+            return;
+        }
+
+        // Sides of different widths (a "0,0,0,1" separator): the ring between the bounds and the
+        // bounds inset by each side's width, filled even-odd.
+        layer.BorderWidth = 0;
+        if (borderLayer is null)
+        {
+            borderLayer = new CAShapeLayer { Name = BorderLayerName, FillRule = CAShapeLayer.FillRuleEvenOdd };
+            layer.AddSublayer(borderLayer);
+        }
+
+        var bounds = platformView.Bounds;
+        var inner = new CGRect(
+            bounds.X + borderThickness.Left,
+            bounds.Y + borderThickness.Top,
+            Math.Max(0, bounds.Width - borderThickness.Left - borderThickness.Right),
+            Math.Max(0, bounds.Height - borderThickness.Top - borderThickness.Bottom));
+        var path = UIBezierPath.FromRoundedRect(bounds, (nfloat)Math.Max(0, radius));
+        path.AppendPath(UIBezierPath.FromRoundedRect(inner, (nfloat)Math.Max(0, radius - Math.Max(borderThickness.Left, borderThickness.Top))));
+        borderLayer.Frame = bounds;
+        borderLayer.Path = path.CGPath;
+        borderLayer.FillColor = color!.ToCGColor();
+        borderLayer.ZPosition = 1;
 #endif
     }
+
+#if MACCATALYST
+    private const CACornerMask AllCorners =
+        CACornerMask.MinXMinYCorner | CACornerMask.MaxXMinYCorner | CACornerMask.MinXMaxYCorner | CACornerMask.MaxXMaxYCorner;
+
+    private static bool IsUniform(Thickness thickness) =>
+        thickness.Left == thickness.Top && thickness.Top == thickness.Right && thickness.Right == thickness.Bottom;
+
+    private static CACornerMask GetRoundedCorners(CornerRadius radius)
+    {
+        var corners = (CACornerMask)0;
+        if (radius.TopLeft > 0) corners |= CACornerMask.MinXMinYCorner;
+        if (radius.TopRight > 0) corners |= CACornerMask.MaxXMinYCorner;
+        if (radius.BottomRight > 0) corners |= CACornerMask.MaxXMaxYCorner;
+        if (radius.BottomLeft > 0) corners |= CACornerMask.MinXMaxYCorner;
+        return corners;
+    }
+#endif
 }
 
 /// <summary>
@@ -82,6 +140,8 @@ public class BorderedStackLayout : StackLayout
     public BorderedStackLayout()
     {
         HandlerChanged += (_, _) => ApplyChrome();
+        // A border whose sides differ is a path sized to the panel.
+        SizeChanged += (_, _) => ApplyChrome();
     }
 
     private static void OnChromeChanged(BindableObject bindable, object oldValue, object newValue)
@@ -130,6 +190,8 @@ public class BorderedGrid : Grid
     public BorderedGrid()
     {
         HandlerChanged += (_, _) => ApplyChrome();
+        // A border whose sides differ is a path sized to the panel.
+        SizeChanged += (_, _) => ApplyChrome();
     }
 
     private static void OnChromeChanged(BindableObject bindable, object oldValue, object newValue)

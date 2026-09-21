@@ -1,3 +1,4 @@
+using System.Linq;
 using CoreGraphics;
 using UIKit;
 
@@ -26,7 +27,7 @@ public sealed class ComboBoxFieldView : UIControl
     {
         Layer.CornerRadius = 8;
         Layer.BorderWidth = 1;
-        Layer.BorderColor = UIColor.Separator.CGColor;
+        UpdateBorderColor();
         BackgroundColor = UIColor.SecondarySystemBackground;
 
         _chevron = new UIImageView(UIImage.GetSystemImage("chevron.down"))
@@ -73,7 +74,7 @@ public sealed class ComboBoxFieldView : UIControl
         set
         {
             _isOpen = value;
-            Layer.BorderColor = value ? UIColor.SystemBlue.CGColor : UIColor.Separator.CGColor;
+            UpdateBorderColor();
             UIView.Animate(0.18, () =>
                 _chevron.Transform = value
                     ? CGAffineTransform.MakeRotation((nfloat)Math.PI)
@@ -112,9 +113,28 @@ public sealed class ComboBoxFieldView : UIControl
 
     public override CGSize IntrinsicContentSize => SizeThatFits(new CGSize(NoIntrinsicMetric, NoIntrinsicMetric));
 
+    /// <summary>The element whose UseSystemFocusVisuals decides whether the focus ring is drawn.</summary>
+    public Microsoft.Maui.Controls.BindableObject? FocusVisualsOwner { get; set; }
+
+    // A plain UIControl takes no keyboard focus; the field is a control the user tabs to, like the
+    // popup button it stands in for, and opens with Space or Return.
+    public override bool CanBecomeFocused => Enabled && UserInteractionEnabled;
+
+    public override void PressesBegan(Foundation.NSSet<UIPress> presses, UIPressesEvent evt)
+    {
+        if (Focused && presses.ToArray().Any(press => press.Key?.KeyCode is UIKeyboardHidUsage.KeyboardSpacebar or UIKeyboardHidUsage.KeyboardReturnOrEnter or UIKeyboardHidUsage.KeypadEnter))
+        {
+            SendActionForControlEvents(UIControlEvent.TouchUpInside);
+            return;
+        }
+
+        base.PressesBegan(presses, evt);
+    }
+
     public override void LayoutSubviews()
     {
         base.LayoutSubviews();
+        FocusRing.UpdateCustomView(this, FocusVisualsOwner);
 
         var height = (double)Bounds.Height;
         var width = (double)Bounds.Width;
@@ -137,6 +157,23 @@ public sealed class ComboBoxFieldView : UIControl
             _contentInsets.Top,
             Math.Max(0, contentWidth),
             Math.Max(0, height - _contentInsets.Top - _contentInsets.Bottom));
+    }
+
+    // A layer's CGColor is resolved once, so the dynamic colours are re-resolved whenever the
+    // appearance (light/dark) or the tint (the system accent, which marks the open field) changes.
+    private void UpdateBorderColor() =>
+        Layer.BorderColor = (_isOpen ? TintColor : UIColor.Separator).GetResolvedColor(TraitCollection).CGColor;
+
+    public override void TraitCollectionDidChange(UITraitCollection? previousTraitCollection)
+    {
+        base.TraitCollectionDidChange(previousTraitCollection);
+        UpdateBorderColor();
+    }
+
+    public override void TintColorDidChange()
+    {
+        base.TintColorDidChange();
+        UpdateBorderColor();
     }
 
     private void OnHover(UIHoverGestureRecognizer recognizer)

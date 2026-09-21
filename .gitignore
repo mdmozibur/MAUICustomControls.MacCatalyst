@@ -3,3 +3,4 @@
 /obj
 /Lottie.MacCatalyst.Binding/bin
 /Lottie.MacCatalyst.Binding/obj
+/Native/*/.build/

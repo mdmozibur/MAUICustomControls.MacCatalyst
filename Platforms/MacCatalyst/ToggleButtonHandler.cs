@@ -13,6 +13,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
 {
     public static PropertyMapper<ToggleButton, ToggleButtonHandler> PropertyMapper = new(ViewMapper)
     {
+        ["UseSystemFocusVisuals"] = (handler, view) => FocusRing.UpdateSystemControl(handler.PlatformView, view),
         [nameof(ToggleButton.Text)] = MapText,
         [nameof(ToggleButton.FontSize)] = MapFontSize,
         [nameof(ToggleButton.Padding)] = MapPadding,
@@ -25,7 +26,21 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         [nameof(ToggleButton.IsChecked)] = MapIsSelected,
         [nameof(ToggleButton.ImageSpacing)] = MapImageSpacing,
         [nameof(ToggleButton.Orientation)] = MapOrientation,
+        // VoiceOver: a toggle with its checked state, named by its text or, for an icon-only button,
+        // its tooltip. MAUI's own semantics mapping would clear the label, so it runs first.
+        [nameof(IView.Semantics)] = (handler, view) =>
+        {
+            ViewHandler.MapSemantics(handler, view);
+            UpdateAccessibility(handler.PlatformView, view);
+        },
+        ["ToolTip"] = (handler, view) =>
+        {
+            ViewHandler.MapToolTip(handler, view);
+            UpdateAccessibility(handler.PlatformView, view);
+        },
     };
+
+    private PointerHoverTracker? _hover;
 
     public ToggleButtonHandler() : base(PropertyMapper) { }
 
@@ -34,7 +49,14 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         base.ConnectHandler(platformView);
 
         ConfigureButton(platformView);
-        platformView.AddTarget(ButtonTapped, UIControlEvent.TouchUpInside);
+        // The primary action (a click, VoiceOver's activate, Space/Return with keyboard focus); the
+        // button has toggled Selected by the time it is sent.
+        platformView.AddTarget(ButtonTapped, UIControlEvent.PrimaryActionTriggered);
+
+        // UWP ToggleButton's PointerOver and Pressed states: hover comes from a hover recognizer,
+        // pressed from the button's Highlighted state, which re-runs the configuration update handler.
+        _hover = new PointerHoverTracker(platformView, () => UpdateInteractionBackground(PlatformView, VirtualView));
+        platformView.ConfigurationUpdateHandler = button => UpdateInteractionBackground(button, VirtualView);
 
         // The glyph is rasterized into a UIImage with the foreground color baked in, so it does
         // not follow the dynamic UIColor.Label the way the title does. Re-render on theme change.
@@ -75,6 +97,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
     {
         var button = new UIButton();
         button.ChangesSelectionAsPrimaryAction = true;
+        MacIdiomControlStyle.Apply(button);
         return button;
     }
 
@@ -85,7 +108,10 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
             application.RequestedThemeChanged -= OnRequestedThemeChanged;
         }
 
-        platformView.RemoveTarget(ButtonTapped, UIControlEvent.TouchUpInside);
+        platformView.RemoveTarget(ButtonTapped, UIControlEvent.PrimaryActionTriggered);
+        platformView.ConfigurationUpdateHandler = null;
+        _hover?.Dispose();
+        _hover = null;
         base.DisconnectHandler(platformView);
     }
 
@@ -112,6 +138,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
     public static void MapText(ToggleButtonHandler handler, ToggleButton view)
     {
         UpdateButtonContent(handler.PlatformView, view);
+        UpdateAccessibility(handler.PlatformView, view);
     }
 
     public static void MapFontSize(ToggleButtonHandler handler, ToggleButton view)
@@ -176,6 +203,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         configuration.ImagePadding = (nfloat)Math.Max(0, view.ImageSpacing);
         configuration.BaseForegroundColor = foregroundColor;
         configuration.ContentInsets = ResolveContentInsets(view.Padding);
+        configuration.CornerStyle = UIButtonConfigurationCornerStyle.Fixed;
         configuration.Background.CornerRadius = 0;
 
         button.Configuration = configuration;
@@ -203,13 +231,42 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
     {
         var contentColor = ResolveContentColor(view);
         var accentColor = ResolveAccentColor(view);
-        var baseBackgroundColor = ResolveBackgroundColor(view);
 
         button.TintColor = contentColor;
         button.Layer.BorderWidth = (nfloat)view.BorderThickness.Left;
         button.Layer.BorderColor = ResolveBorderColor(view, accentColor).CGColor;
-        button.BackgroundColor = view.IsChecked ? accentColor.ColorWithAlpha(0.16f) : baseBackgroundColor;
         button.Alpha = button.Enabled ? 1f : 0.55f;
+        UpdateInteractionBackground(button, view);
+        UpdateAccessibility(button, view);
+    }
+
+    private static void UpdateAccessibility(UIButton button, ToggleButton view) =>
+        ButtonAccessibility.Update(button, view, isToggle: true, isOn: view.IsChecked, text: view.Text);
+
+    // Unchecked, the template paints its root with ToggleButtonBackgroundPointerOver/Pressed over the
+    // control's own background. Checked keeps this control's accent tint, a little stronger under the
+    // pointer and lighter while pressed, as WinUI's AccentFillColorSecondary/Tertiary are.
+    private static void UpdateInteractionBackground(UIButton? button, ToggleButton? view)
+    {
+        if (button is null || view is null)
+        {
+            return;
+        }
+
+        var hovered = (view.Handler as ToggleButtonHandler)?._hover?.IsHovered == true;
+        var pressed = button.Highlighted;
+        if (view.IsChecked)
+        {
+            var tint = !button.Enabled ? 0.16f : pressed ? 0.10f : hovered ? 0.24f : 0.16f;
+            button.BackgroundColor = ResolveAccentColor(view).ColorWithAlpha(tint);
+            return;
+        }
+
+        button.BackgroundColor = !button.Enabled
+            ? ResolveBackgroundColor(view)
+            : pressed
+                ? InteractionColors.Pressed(InteractionColors.ToggleButtonPressedKey)
+                : hovered ? InteractionColors.PointerOver(InteractionColors.ToggleButtonPointerOverKey) : ResolveBackgroundColor(view);
     }
 
     private static NSDirectionalEdgeInsets ResolveContentInsets(Thickness padding)

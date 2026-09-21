@@ -9,7 +9,10 @@ using UIKit;
 namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst;
 
 /// <summary>Visual settings for one popover, read from the <see cref="PopoverButton"/> when it opens.</summary>
-internal readonly record struct PopoverChromeOptions(double CornerRadius, bool ShowArrow, Thickness Padding);
+/// <param name="Stroke">Border colour; null draws the system separator hairline.</param>
+/// <param name="StrokeThickness">Border width in points; 0 is one device pixel.</param>
+internal readonly record struct PopoverChromeOptions(double CornerRadius, bool ShowArrow, Thickness Padding, UIColor? Stroke = null, double StrokeThickness = 0);
+
 
 /// <summary>Which side of the source view the popover sits on.</summary>
 internal enum PopoverSide
@@ -91,6 +94,14 @@ internal sealed class PopoverChromeView : UIView
     /// <summary>Where the arrow tip points along its edge, in this view's coordinates.</summary>
     public double ArrowPosition { get; set; }
 
+    // The bubble's layer colours are resolved in LayoutSubviews; lay out again when the appearance
+    // (light/dark) changes so they are re-resolved.
+    public override void TraitCollectionDidChange(UITraitCollection? previousTraitCollection)
+    {
+        base.TraitCollectionDidChange(previousTraitCollection);
+        SetNeedsLayout();
+    }
+
     public override void LayoutSubviews()
     {
         base.LayoutSubviews();
@@ -114,8 +125,8 @@ internal sealed class PopoverChromeView : UIView
         _backgroundLayer.Frame = Bounds;
         _backgroundLayer.Path = outline;
         _backgroundLayer.FillColor = UIColor.SecondarySystemBackground.GetResolvedColor(TraitCollection).CGColor;
-        _backgroundLayer.StrokeColor = UIColor.Separator.GetResolvedColor(TraitCollection).CGColor;
-        _backgroundLayer.LineWidth = (nfloat)(1 / Math.Max(1, (double)TraitCollection.DisplayScale));
+        _backgroundLayer.StrokeColor = (_options.Stroke ?? UIColor.Separator).GetResolvedColor(TraitCollection).CGColor;
+        _backgroundLayer.LineWidth = (nfloat)(_options.StrokeThickness > 0 ? _options.StrokeThickness : 1 / Math.Max(1, (double)TraitCollection.DisplayScale));
         Layer.ShadowPath = outline;
         CATransaction.Commit();
     }
@@ -215,12 +226,9 @@ internal sealed class PopoverChromeView : UIView
 /// </remarks>
 internal sealed class PopoverPresentationController : UIPresentationController
 {
-    private const double EdgeMargin = 8;
-    private const double GapWithArrow = 1;
-    private const double GapWithoutArrow = 4;
-
     private readonly UIView _sourceView;
     private readonly PopoverDirection _direction;
+    private readonly PopoverAlignment _alignment;
     private readonly PopoverChromeOptions _options;
     private readonly Action _onOutsideTap;
 
@@ -232,12 +240,14 @@ internal sealed class PopoverPresentationController : UIPresentationController
         UIViewController? presentingViewController,
         UIView sourceView,
         PopoverDirection direction,
+        PopoverAlignment alignment,
         PopoverChromeOptions options,
         Action onOutsideTap)
         : base(presentedViewController, presentingViewController)
     {
         _sourceView = sourceView;
         _direction = direction;
+        _alignment = alignment;
         _options = options;
         _onOutsideTap = onOutsideTap;
     }
@@ -321,35 +331,76 @@ internal sealed class PopoverPresentationController : UIPresentationController
             return (CGRect.Empty, PopoverSide.Below, 0);
 
         var source = _sourceView.ConvertRectToView(_sourceView.Bounds, container);
+        return PopoverLayout.Compute(
+            source,
+            PopoverLayout.UsableArea(container),
+            PresentedViewController.PreferredContentSize,
+            _direction,
+            _alignment,
+            _options);
+    }
 
-        // Stay inside the safe area, so the popover never slides under the title bar.
+    internal static double Fraction(double position, double length) =>
+        length <= 0 ? 0.5 : Math.Clamp(position / length, 0, 1);
+}
+
+/// <summary>Where a popover goes: which side of its source, and where along that side.</summary>
+internal static class PopoverLayout
+{
+    public const double EdgeMargin = 8;
+    private const double GapWithArrow = 1;
+    private const double GapWithoutArrow = 4;
+
+    /// <summary>The part of <paramref name="container"/> a popover may cover: inside the safe area, off the edges.</summary>
+    public static CGRect UsableArea(UIView container)
+    {
         var insets = container.SafeAreaInsets;
-        double left = insets.Left + EdgeMargin;
-        double top = insets.Top + EdgeMargin;
-        double right = container.Bounds.Width - insets.Right - EdgeMargin;
-        double bottom = container.Bounds.Height - insets.Bottom - EdgeMargin;
+        var left = insets.Left + EdgeMargin;
+        var top = insets.Top + EdgeMargin;
+        return new CGRect(
+            left,
+            top,
+            Math.Max(0, container.Bounds.Width - insets.Right - EdgeMargin - left),
+            Math.Max(0, container.Bounds.Height - insets.Bottom - EdgeMargin - top));
+    }
 
-        var content = PresentedViewController.PreferredContentSize;
-        var arrow = _options.ShowArrow ? PopoverChromeView.ArrowLength : 0;
-        var gap = _options.ShowArrow ? GapWithArrow : GapWithoutArrow;
+    /// <summary>
+    /// Places content of <paramref name="content"/> size beside <paramref name="source"/>, both in the
+    /// coordinates of <paramref name="area"/>. The frame includes the arrow.
+    /// </summary>
+    public static (CGRect Frame, PopoverSide Side, double ArrowPosition) Compute(
+        CGRect source,
+        CGRect area,
+        CGSize content,
+        PopoverDirection direction,
+        PopoverAlignment alignment,
+        PopoverChromeOptions options)
+    {
+        double left = area.X, top = area.Y, right = area.GetMaxX(), bottom = area.GetMaxY();
+        var arrow = options.ShowArrow ? PopoverChromeView.ArrowLength : 0;
+        var gap = options.ShowArrow ? GapWithArrow : GapWithoutArrow;
 
-        var side = ResolveSide(source, left, top, right, bottom, content.Width + arrow + gap, content.Height + arrow + gap);
+        var side = ResolveSide(direction, source, left, top, right, bottom, content.Width + arrow + gap, content.Height + arrow + gap);
         var horizontal = side is PopoverSide.Left or PopoverSide.Right;
 
         var width = Math.Min(content.Width + (horizontal ? arrow : 0), Math.Max(0, right - left));
         var height = Math.Min(content.Height + (horizontal ? 0 : arrow), Math.Max(0, bottom - top));
 
+        // With an edge alignment the arrow must still reach the source's middle, clear of the
+        // rounded corner, so a small source pushes the popover back a little.
+        var arrowInset = options.ShowArrow ? options.CornerRadius + PopoverChromeView.ArrowHalfWidth : 0;
+
         double x = side switch
         {
             PopoverSide.Right => source.GetMaxX() + gap,
             PopoverSide.Left => source.X - gap - width,
-            _ => source.GetMidX() - width / 2
+            _ => Align(alignment, source.X, source.GetMaxX(), width, arrowInset)
         };
         double y = side switch
         {
             PopoverSide.Below => source.GetMaxY() + gap,
             PopoverSide.Above => source.Y - gap - height,
-            _ => source.GetMidY() - height / 2
+            _ => Align(alignment, source.Y, source.GetMaxY(), height, arrowInset)
         };
 
         x = Math.Clamp(x, left, Math.Max(left, right - width));
@@ -359,14 +410,25 @@ internal sealed class PopoverPresentationController : UIPresentationController
         return (new CGRect(x, y, width, height), side, arrowPosition);
     }
 
-    private PopoverSide ResolveSide(CGRect source, double left, double top, double right, double bottom, double neededWidth, double neededHeight)
+    private static double Align(PopoverAlignment alignment, double sourceStart, double sourceEnd, double length, double arrowInset)
+    {
+        var middle = (sourceStart + sourceEnd) / 2;
+        return alignment switch
+        {
+            PopoverAlignment.Start => Math.Min(sourceStart, middle - arrowInset),
+            PopoverAlignment.End => Math.Max(sourceEnd, middle + arrowInset) - length,
+            _ => middle - length / 2
+        };
+    }
+
+    private static PopoverSide ResolveSide(PopoverDirection direction, CGRect source, double left, double top, double right, double bottom, double neededWidth, double neededHeight)
     {
         double spaceRight = right - source.GetMaxX();
         double spaceLeft = source.X - left;
         double spaceBelow = bottom - source.GetMaxY();
         double spaceAbove = source.Y - top;
 
-        return _direction switch
+        return direction switch
         {
             PopoverDirection.Right => Pick(PopoverSide.Right, spaceRight, PopoverSide.Left, spaceLeft, neededWidth),
             PopoverDirection.Left => Pick(PopoverSide.Left, spaceLeft, PopoverSide.Right, spaceRight, neededWidth),
@@ -391,9 +453,6 @@ internal sealed class PopoverPresentationController : UIPresentationController
 
         return preferredSpace >= oppositeSpace ? preferred : opposite;
     }
-
-    private static double Fraction(double position, double length) =>
-        length <= 0 ? 0.5 : Math.Clamp(position / length, 0, 1);
 }
 
 /// <summary>Supplies the presentation controller and the open/close animations.</summary>
@@ -401,13 +460,15 @@ internal sealed class PopoverTransitioningDelegate : UIViewControllerTransitioni
 {
     private readonly UIView _sourceView;
     private readonly PopoverDirection _direction;
+    private readonly PopoverAlignment _alignment;
     private readonly PopoverChromeOptions _options;
     private readonly Action _onOutsideTap;
 
-    public PopoverTransitioningDelegate(UIView sourceView, PopoverDirection direction, PopoverChromeOptions options, Action onOutsideTap)
+    public PopoverTransitioningDelegate(UIView sourceView, PopoverDirection direction, PopoverAlignment alignment, PopoverChromeOptions options, Action onOutsideTap)
     {
         _sourceView = sourceView;
         _direction = direction;
+        _alignment = alignment;
         _options = options;
         _onOutsideTap = onOutsideTap;
     }
@@ -417,7 +478,7 @@ internal sealed class PopoverTransitioningDelegate : UIViewControllerTransitioni
         UIViewController? presentingViewController,
         UIViewController sourceViewController) =>
         new PopoverPresentationController(
-            presentedViewController, presentingViewController, _sourceView, _direction, _options, _onOutsideTap);
+            presentedViewController, presentingViewController, _sourceView, _direction, _alignment, _options, _onOutsideTap);
 
     public override IUIViewControllerAnimatedTransitioning GetAnimationControllerForPresentedController(
         UIViewController presented, UIViewController presenting, UIViewController source) =>

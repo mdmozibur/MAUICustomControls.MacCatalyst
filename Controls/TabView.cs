@@ -36,6 +36,7 @@ public class TabView : Grid
 
 	private readonly ObservableCollection<TabViewItem> _items = new();
 	private readonly HorizontalStackLayout _headerRow;
+	private readonly string _focusGroup;
 	private bool _layoutBuilt;
 
 	public int SelectedIndex
@@ -56,6 +57,7 @@ public class TabView : Grid
 		{
 			Spacing = 0,
 		};
+		_focusGroup = AccessibleItemFocus.GroupFor(this);
 		Grid.SetRow((BindableObject)_headerRow, 0);
 		base.Children.Add(_headerRow);
 
@@ -89,12 +91,22 @@ public class TabView : Grid
 				VerticalTextAlignment = TextAlignment.Center,
 			};
 
-			headerLabel.GestureRecognizers.Add(new TapGestureRecognizer
+			// A tab to the keyboard and VoiceOver: one Tab stop for the strip, ← and → move
+			// between tabs, Space/Return select the focused one.
+			var header = new AccessibleItemView
+			{
+				Role = AccessibleItemRole.Tab,
+				FocusGroup = _focusGroup,
+				Content = headerLabel,
+			};
+			header.GestureRecognizers.Add(new TapGestureRecognizer
 			{
 				Command = new Command(() => SelectedIndex = index),
 			});
+			header.Invoked += (_, _) => SelectedIndex = index;
+			header.MoveRequested += (_, args) => args.Handled = MoveSelection(index + args.Delta);
 
-			_headerRow.Children.Add(headerLabel);
+			_headerRow.Children.Add(header);
 
 			Grid.SetRow((BindableObject)item, 1);
 			base.Children.Add(item);
@@ -105,10 +117,22 @@ public class TabView : Grid
 		UpdateSelection();
 	}
 
+	private bool MoveSelection(int index)
+	{
+		if (index < 0 || index >= _items.Count || index >= _headerRow.Children.Count)
+		{
+			return false;
+		}
+
+		SelectedIndex = index;
+		AccessibleItemFocus.MoveTo(_headerRow.Children[index]);
+		return true;
+	}
+
 	private void OnItemHeaderChanged(TabViewItem item)
 	{
 		var idx = _items.IndexOf(item);
-		if (idx >= 0 && idx < _headerRow.Children.Count && _headerRow.Children[idx] is Label lbl)
+		if (idx >= 0 && idx < _headerRow.Children.Count && _headerRow.Children[idx] is AccessibleItemView { Content: Label lbl })
 		{
 			lbl.Text = item.Header;
 		}
@@ -131,9 +155,10 @@ public class TabView : Grid
 	{
 		for (int i = 0; i < _headerRow.Children.Count; i++)
 		{
-			if (_headerRow.Children[i] is Label lbl)
+			if (_headerRow.Children[i] is AccessibleItemView { Content: Label lbl } header)
 			{
 				bool selected = (i == SelectedIndex);
+				header.IsSelected = selected;
 				lbl.FontAttributes = selected ? FontAttributes.Bold : FontAttributes.None;
 				lbl.Opacity = selected ? 1.0 : 0.6;
 				lbl.TextDecorations = selected ? TextDecorations.Underline : TextDecorations.None;

@@ -23,9 +23,10 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
 
         public static PropertyMapper<PopoverButton, PopoverButtonHandler> PropertyMapper = new(ViewMapper)
         {
+            ["UseSystemFocusVisuals"] = (handler, view) => handler.PlatformView.SetNeedsLayout(),
             [nameof(PopoverButton.BorderColor)] = MapBorder,
             [nameof(PopoverButton.BorderWidth)] = MapBorder,
-            [nameof(IContentView.Content)] = MapContent
+            [nameof(IContentView.Content)] = MapContent,
         };
 
         public PopoverButtonHandler() : base(PropertyMapper)
@@ -33,6 +34,10 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
         }
 
         private bool IsPopoverPresented => _popoverController?.PresentingViewController is not null;
+
+        // A button to VoiceOver and to keyboard navigation, which a tap recognizer alone is not.
+        protected override Microsoft.Maui.Platform.ContentView CreatePlatformView() =>
+            new PopoverButtonView(() => OnTapped()) { CrossPlatformLayout = VirtualView, FocusVisualsOwner = VirtualView as Microsoft.Maui.Controls.BindableObject };
 
         protected override void ConnectHandler(Microsoft.Maui.Platform.ContentView platformView)
         {
@@ -44,6 +49,17 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
             if (VirtualView is PopoverButton popoverButton)
             {
                 popoverButton.HidePopoverAction = () => HideActivePopover(animated: true);
+                // Listened to rather than mapped: mapping IsEnabled here would replace MAUI's own mapping.
+                popoverButton.PropertyChanged += PopoverButton_PropertyChanged;
+                MapAccessibility(this, popoverButton);
+            }
+        }
+
+        private void PopoverButton_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (sender is PopoverButton popoverButton && e.PropertyName is nameof(PopoverButton.IsEnabled) or nameof(PopoverButton.Text) or "Description" or "Hint" or "Text")
+            {
+                MapAccessibility(this, popoverButton);
             }
         }
 
@@ -52,6 +68,7 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
             if (VirtualView is PopoverButton popoverButton)
             {
                 popoverButton.HidePopoverAction = null;
+                popoverButton.PropertyChanged -= PopoverButton_PropertyChanged;
             }
 
             if (_tapGestureRecognizer != null)
@@ -73,9 +90,37 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
             // handler.PlatformView.Layer.CornerRadius = popoverButton.CornerRadius.TopLeft;
         }
 
+        private static void MapAccessibility(PopoverButtonHandler handler, PopoverButton popoverButton)
+        {
+            var view = handler.PlatformView;
+            view.IsAccessibilityElement = true;
+            view.AccessibilityTraits = popoverButton.IsEnabled
+                ? UIAccessibilityTrait.Button
+                : UIAccessibilityTrait.Button | UIAccessibilityTrait.NotEnabled;
+
+            // An explicit description wins; otherwise the button's text, then its tooltip (icon buttons).
+            view.AccessibilityLabel = FirstNonEmpty(
+                Microsoft.Maui.Controls.SemanticProperties.GetDescription(popoverButton),
+                popoverButton.Text,
+                popoverButton.Content as string,
+                Microsoft.Maui.Controls.ToolTipProperties.GetText(popoverButton)?.ToString());
+            view.AccessibilityHint = Microsoft.Maui.Controls.SemanticProperties.GetHint(popoverButton);
+
+            // A button that opens a flyout reads as collapsed or expanded, like a pop-up button.
+            if (OperatingSystem.IsMacCatalystVersionAtLeast(18))
+            {
+                view.AccessibilityExpandedStatus = popoverButton.GetPresentedContent() is null
+                    ? UIAccessibilityExpandedStatus.Unsupported
+                    : handler.IsPopoverPresented ? UIAccessibilityExpandedStatus.Expanded : UIAccessibilityExpandedStatus.Collapsed;
+            }
+        }
+
+        private static string? FirstNonEmpty(params string?[] values) =>
+            values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
         private void OnTapped()
         {
-            if (VirtualView is not PopoverButton popoverButton)
+            if (VirtualView is not PopoverButton { IsEnabled: true } popoverButton)
                 return;
 
             popoverButton.RaiseClicked();
@@ -103,6 +148,7 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
             _transitioningDelegate = new PopoverTransitioningDelegate(
                 PlatformView,
                 popoverButton.PopoverDirection,
+                popoverButton.PopoverAlignment,
                 new PopoverChromeOptions(popoverButton.PopoverCornerRadius, popoverButton.ShowPopoverArrow, popoverButton.PopoverPadding),
                 onOutsideTap: () => HideActivePopover(animated: true));
             controller.TransitioningDelegate = _transitioningDelegate;
@@ -111,7 +157,11 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
 
             // Opened is raised once the popover is on screen, as UWP's Flyout does. Raising it
             // before presenting ran its handlers (e.g. a canvas redraw) ahead of the animation.
-            presentingController.PresentViewController(controller, true, () => popoverButton.RaiseOpened());
+            presentingController.PresentViewController(controller, true, () =>
+            {
+                MapAccessibility(this, popoverButton);
+                popoverButton.RaiseOpened();
+            });
         }
 
         private PopoverHostViewController GetOrCreatePopoverController(Microsoft.Maui.Controls.View content)
@@ -193,7 +243,11 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
         {
             _isDismissing = false;
             _transitioningDelegate = null;
-            (VirtualView as PopoverButton)?.RaiseClosed();
+            if (VirtualView is PopoverButton popoverButton)
+            {
+                MapAccessibility(this, popoverButton);
+                popoverButton.RaiseClosed();
+            }
         }
 
         private UIViewController? GetPresentingViewController()
@@ -209,6 +263,45 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
                 controller = controller.PresentedViewController;
 
             return controller;
+        }
+    }
+
+    /// <summary>
+    /// The button's native view: activated by VoiceOver and, when it has keyboard focus (Tab with
+    /// keyboard navigation on), by Space or Return, like a native button.
+    /// </summary>
+    internal sealed class PopoverButtonView : Microsoft.Maui.Platform.ContentView
+    {
+        private readonly Action _activate;
+
+        public PopoverButtonView(Action activate) => _activate = activate;
+
+        /// <summary>The element whose UseSystemFocusVisuals decides whether the focus ring is drawn.</summary>
+        public Microsoft.Maui.Controls.BindableObject? FocusVisualsOwner { get; set; }
+
+        public override bool CanBecomeFocused => UserInteractionEnabled && !AccessibilityTraits.HasFlag(UIAccessibilityTrait.NotEnabled);
+
+        public override void LayoutSubviews()
+        {
+            base.LayoutSubviews();
+            FocusRing.UpdateCustomView(this, FocusVisualsOwner);
+        }
+
+        public override bool AccessibilityActivate()
+        {
+            _activate();
+            return true;
+        }
+
+        public override void PressesBegan(Foundation.NSSet<UIPress> presses, UIPressesEvent evt)
+        {
+            if (Focused && presses.ToArray().Any(press => press.Key?.KeyCode is UIKeyboardHidUsage.KeyboardSpacebar or UIKeyboardHidUsage.KeyboardReturnOrEnter or UIKeyboardHidUsage.KeypadEnter))
+            {
+                _activate();
+                return;
+            }
+
+            base.PressesBegan(presses, evt);
         }
     }
 }

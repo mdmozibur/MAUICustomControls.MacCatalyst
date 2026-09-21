@@ -19,6 +19,7 @@ public sealed class TemplatedComboBoxHandler : ViewHandler<TemplatedComboBox, Co
     public static readonly PropertyMapper<TemplatedComboBox, TemplatedComboBoxHandler> Mapper =
         new(ViewMapper)
         {
+            ["UseSystemFocusVisuals"] = (handler, view) => handler.PlatformView.SetNeedsLayout(),
             [nameof(TemplatedComboBox.ItemsSource)] = MapContent,
             [nameof(TemplatedComboBox.ItemTemplate)] = MapContent,
             [nameof(TemplatedComboBox.SelectedItemTemplate)] = MapContent,
@@ -45,6 +46,7 @@ public sealed class TemplatedComboBoxHandler : ViewHandler<TemplatedComboBox, Co
     {
         base.ConnectHandler(platformView);
 
+        platformView.FocusVisualsOwner = VirtualView;
         platformView.TouchUpInside += OnFieldTapped;
         VirtualView.ItemsChanged += OnItemsChanged;
     }

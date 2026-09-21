@@ -11,6 +11,7 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
 {
     public static PropertyMapper<ToggleSwitch, ToggleSwitchHandler> PropertyMapper = new(ViewMapper)
     {
+        ["UseSystemFocusVisuals"] = (handler, view) => FocusRing.UpdateSystemControl(handler.PlatformView.SwitchControl, view),
         [nameof(ToggleSwitch.Text)] = MapText,
         [nameof(ToggleSwitch.FontSize)] = MapFontSize,
         [nameof(ToggleSwitch.Padding)] = MapPadding,
@@ -104,23 +105,16 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
 
     public static void MapForeground(ToggleSwitchHandler handler, ToggleSwitch view)
     {
-        handler.PlatformView.TextLabel.TextColor = ResolveBrushColor(view.Foreground, ResolveThemeForeground());
-    }
-
-    private static UIColor ResolveThemeForeground()
-    {
-        if (Application.Current?.Resources.TryGetValue("ToggleSwitchContentForeground", out var resource) == true &&
-            resource is SolidColorBrush brush && brush.Color is Color color)
-        {
-            return color.ToPlatform();
-        }
-
-        return Colors.Black.ToPlatform();
+        // Without a Foreground the label is body text: UIColor.Label is dynamic, so it follows the
+        // app's theme without re-mapping (a colour read from the resources once would not).
+        handler.PlatformView.TextLabel.TextColor = ResolveBrushColor(view.Foreground, UIColor.Label);
     }
 
     public static void MapOnColor(ToggleSwitchHandler handler, ToggleSwitch view)
     {
-        handler.PlatformView.SwitchControl.OnTintColor = view.OnColor.ToPlatform();
+        // Without an OnColor the track takes the tint, which the app sets to the system accent (as
+        // WinUI's ToggleSwitchFillOn); UIColor.Tint resolves against the switch's own tint.
+        handler.PlatformView.SwitchControl.OnTintColor = view.OnColor?.ToPlatform() ?? UIColor.Tint;
     }
 
     private static UIColor ResolveBrushColor(global::Microsoft.Maui.Controls.SolidColorBrush? brush, UIColor fallbackColor)
@@ -178,6 +172,7 @@ public sealed class ToggleSwitchHandler : ViewHandler<ToggleSwitch, ToggleSwitch
 
         public ToggleSwitchView()
         {
+            MacIdiomControlStyle.Apply(SwitchControl);
             AddSubview(TextLabel);
             AddSubview(SwitchControl);
         }

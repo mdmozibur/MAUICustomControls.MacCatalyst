@@ -14,7 +14,32 @@ public sealed class ContentButton : ContentView
 		var tapGestureRecognizer = new TapGestureRecognizer();
 		tapGestureRecognizer.Tapped += OnTapped;
 		GestureRecognizers.Add(tapGestureRecognizer);
+
+		// The button chrome (a UWP Button's border and rounded corners) is painted on the native
+		// layer, like the bordered panels; the converted app's implicit ContentButton style gives it
+		// the WinUI button colours.
+		HandlerChanged += (_, _) => ApplyChrome();
+		SizeChanged += (_, _) => ApplyChrome();
 	}
+
+	public static readonly BindableProperty CornerRadiusProperty =
+		BindableProperty.Create(nameof(CornerRadius), typeof(CornerRadius), typeof(ContentButton), default(CornerRadius), propertyChanged: OnChromeChanged);
+
+	public CornerRadius CornerRadius
+	{
+		get => (CornerRadius)GetValue(CornerRadiusProperty);
+		set => SetValue(CornerRadiusProperty, value);
+	}
+
+	private static void OnChromeChanged(BindableObject bindable, object? oldValue, object? newValue)
+	{
+		_ = oldValue;
+		_ = newValue;
+		((ContentButton)bindable).ApplyChrome();
+	}
+
+	private void ApplyChrome() =>
+		BorderedLayoutChrome.Apply(this, BorderColor is null ? null : new SolidColorBrush(BorderColor), new Thickness(BorderWidth), CornerRadius);
 
 	public static readonly BindableProperty TextProperty =
 		BindableProperty.Create(nameof(Text), typeof(string), typeof(ContentButton), string.Empty, propertyChanged: OnButtonFaceChanged);
@@ -80,22 +105,22 @@ public sealed class ContentButton : ContentView
 	}
 
 	public static readonly BindableProperty BorderColorProperty =
-		BindableProperty.Create(nameof(BorderColor), typeof(Color), typeof(ContentButton), Colors.Gray);
+		BindableProperty.Create(nameof(BorderColor), typeof(Color), typeof(ContentButton), null, propertyChanged: OnChromeChanged);
 
-	public Color BorderColor
+	public Color? BorderColor
 	{
-		get => (Color)GetValue(BorderColorProperty);
+		get => (Color?)GetValue(BorderColorProperty);
 		set => SetValue(BorderColorProperty, value);
 	}
 
-	public Color BorderBrush
+	public Color? BorderBrush
 	{
 		get => BorderColor;
 		set => BorderColor = value;
 	}
 
 	public static readonly BindableProperty BorderWidthProperty =
-		BindableProperty.Create(nameof(BorderWidth), typeof(double), typeof(ContentButton), 1.0);
+		BindableProperty.Create(nameof(BorderWidth), typeof(double), typeof(ContentButton), 1.0, propertyChanged: OnChromeChanged);
 
 	public double BorderWidth
 	{

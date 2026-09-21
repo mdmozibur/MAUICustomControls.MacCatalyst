@@ -28,6 +28,7 @@ public partial class CustomTabView : Grid
             modifiers: null);
 
     private readonly ObservableCollection<object> _items = new();
+    private string? _tabFocusGroup;
 
     public event EventHandler<EventArgs>? AddButtonClick;
 
@@ -106,6 +107,27 @@ public partial class CustomTabView : Grid
         TabScrollView.SizeChanged += ScrollView_SizeChanged;
         TabScrollView.Scrolled += ScrollView_Scrolled;
         TabHost.SizeChanged += TabHost_SizeChanged;
+#if MACCATALYST || IOS
+        // The strip usually sits in the window's title bar area; UIKit would push its content down
+        // by the (unsafe) title bar inset. A horizontal tab strip has no inset to respect...
+        TabScrollView.HandlerChanged += (_, _) =>
+        {
+            if (TabScrollView.Handler?.PlatformView is UIKit.UIScrollView scrollView)
+            {
+                scrollView.ContentInsetAdjustmentBehavior = UIKit.UIScrollViewContentInsetAdjustmentBehavior.Never;
+
+                // Nor the soft edge (macOS 26) that blurs scrolled content under a title bar: the tabs
+                // are the title bar.
+                if (OperatingSystem.IsMacCatalystVersionAtLeast(26) || OperatingSystem.IsIOSVersionAtLeast(26))
+                {
+                    scrollView.TopEdgeEffect.Hidden = true;
+                    scrollView.BottomEdgeEffect.Hidden = true;
+                    scrollView.LeftEdgeEffect.Hidden = true;
+                    scrollView.RightEdgeEffect.Hidden = true;
+                }
+            }
+        };
+#endif
 
         UpdateVisualStates();
     }
@@ -138,6 +160,7 @@ public partial class CustomTabView : Grid
     {
         tabItem.BindingContext = item;
         tabItem.Title = "Tab " + _items.IndexOf(item);
+        tabItem.CanCopyFilePath = CanCopyFilePath(item);
 
         tabItem.IsSelected = Equals(item, SelectedItem);
     }
@@ -199,8 +222,7 @@ public partial class CustomTabView : Grid
         {
             var tabItem = CreateTabItem();
             ConfigureTabItem(tabItem, item);
-            tabItem.SelectionRequested += TabItem_SelectionRequested;
-            tabItem.CloseRequested += TabItem_CloseRequested;
+            AttachTab(tabItem);
             tabHost.Children.Insert(index++, tabItem);
         }
     }
@@ -211,8 +233,7 @@ public partial class CustomTabView : Grid
         {
             if (startIndex < tabHost.Children.Count && tabHost.Children[startIndex] is TabItem tab)
             {
-                tab.SelectionRequested -= TabItem_SelectionRequested;
-                tab.CloseRequested -= TabItem_CloseRequested;
+                DetachTab(tab);
                 tabHost.Children.RemoveAt(startIndex);
             }
         }
@@ -264,8 +285,7 @@ public partial class CustomTabView : Grid
     {
         foreach (var existingTab in TabHost.Children.OfType<TabItem>().ToArray())
         {
-            existingTab.SelectionRequested -= TabItem_SelectionRequested;
-            existingTab.CloseRequested -= TabItem_CloseRequested;
+            DetachTab(existingTab);
         }
 
         TabHost.Children.Clear();
@@ -273,8 +293,7 @@ public partial class CustomTabView : Grid
         {
             var tabItem = CreateTabItem();
             ConfigureTabItem(tabItem, item);
-            tabItem.SelectionRequested += TabItem_SelectionRequested;
-            tabItem.CloseRequested += TabItem_CloseRequested;
+            AttachTab(tabItem);
             TabHost.Children.Add(tabItem);
         }
 
@@ -333,6 +352,44 @@ public partial class CustomTabView : Grid
             && TabHost.Width > TabScrollView.Width + 1;
     }
 
+    private void AttachTab(TabItem tabItem)
+    {
+        // The tab strip is one keyboard focus group: Tab lands on the selected tab, ← and → move.
+        tabItem.FocusGroup = _tabFocusGroup ??= AccessibleItemFocus.GroupFor(this);
+        tabItem.SelectionRequested += TabItem_SelectionRequested;
+        tabItem.CloseRequested += TabItem_CloseRequested;
+        tabItem.DuplicateRequested += TabItem_DuplicateRequested;
+        tabItem.MoveRequested += TabItem_MoveRequested;
+    }
+
+    private void DetachTab(TabItem tabItem)
+    {
+        tabItem.SelectionRequested -= TabItem_SelectionRequested;
+        tabItem.CloseRequested -= TabItem_CloseRequested;
+        tabItem.DuplicateRequested -= TabItem_DuplicateRequested;
+        tabItem.MoveRequested -= TabItem_MoveRequested;
+    }
+
+    // ← or → on a focused tab selects its neighbour, and keyboard focus follows.
+    private void TabItem_MoveRequested(object? sender, AccessibleItemMoveEventArgs e)
+    {
+        if (sender is not TabItem tabItem)
+        {
+            return;
+        }
+
+        var tabs = TabHost.Children.OfType<TabItem>().ToList();
+        var index = tabs.IndexOf(tabItem) + e.Delta;
+        if (index < 0 || index >= tabs.Count)
+        {
+            return;
+        }
+
+        SelectedItem = tabs[index].BindingContext;
+        AccessibleItemFocus.MoveTo(tabs[index]);
+        e.Handled = true;
+    }
+
     private void TabItem_SelectionRequested(object? sender, EventArgs e)
     {
         if (sender is TabItem tabItem)
@@ -346,6 +403,14 @@ public partial class CustomTabView : Grid
         if (sender is TabItem tabItem)
         {
             CloseButtonClick?.Invoke(this, tabItem);
+        }
+    }
+
+    private void TabItem_DuplicateRequested(object? sender, EventArgs e)
+    {
+        if (sender is TabItem tabItem)
+        {
+            DuplicateRequested?.Invoke(this, tabItem);
         }
     }
 

@@ -69,12 +69,13 @@ public sealed class ToggleSwitch : View
         set => SetValue(ForegroundProperty, value);
     }
 
+    // Null (the default) uses the system accent colour, as UWP's ToggleSwitchFillOn does.
     public static readonly BindableProperty OnColorProperty =
-        BindableProperty.Create(nameof(OnColor), typeof(Color), typeof(ToggleSwitch), Colors.DodgerBlue);
+        BindableProperty.Create(nameof(OnColor), typeof(Color), typeof(ToggleSwitch), null);
 
-    public Color OnColor
+    public Color? OnColor
     {
-        get => (Color)GetValue(OnColorProperty);
+        get => (Color?)GetValue(OnColorProperty);
         set => SetValue(OnColorProperty, value);
     }
 

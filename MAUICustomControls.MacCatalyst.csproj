@@ -20,6 +20,8 @@
 		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+    <!-- StoreKitBridge.cs passes unmanaged function pointers to the native bridge. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
 		<!-- Display name -->
 		<ApplicationTitle>MAUICustomControls.MacCatalyst</ApplicationTitle>
@@ -68,5 +70,15 @@
 	<ItemGroup>
 		<Compile Remove="Lottie.MacCatalyst.Binding/**/*.cs" />
 	</ItemGroup>
+
+  <!-- StoreKit 2 bridge (Swift, C API) called by Platforms/MacCatalyst/StoreKitBridge.cs.
+       Build it with: bash Native/StoreKitBridge/build_xcframework.sh -->
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
+    <NativeReference Include="Native\StoreKitBridge\bin\StoreKitBridge.xcframework">
+      <Kind>Framework</Kind>
+      <SmartLink>false</SmartLink>
+      <Frameworks>StoreKit</Frameworks>
+    </NativeReference>
+  </ItemGroup>
 
 </Project>

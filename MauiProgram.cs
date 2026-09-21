@@ -31,8 +31,13 @@ public static class MauiProgram
                 handlers.AddHandler(typeof(Controls.AnimatedVisualPlayer), typeof(Platforms.MacCatalyst.AnimatedVisualPlayerHandler));
                 handlers.AddHandler(typeof(Controls.Canvas), typeof(Platforms.MacCatalyst.CanvasHandler));
                 handlers.AddHandler(typeof(Controls.ColorWell), typeof(Platforms.MacCatalyst.ColorWellHandler));
+                handlers.AddHandler(typeof(Controls.ProgressRing), typeof(Platforms.MacCatalyst.ProgressRingHandler));
+                handlers.AddHandler(typeof(Controls.AccessibleItemView), typeof(Platforms.MacCatalyst.AccessibleItemHandler));
+                handlers.AddHandler(typeof(Controls.TabItem), typeof(Platforms.MacCatalyst.AccessibleItemHandler));
 
                 Platforms.MacCatalyst.EntryHandlerCustomization.Configure();
+                Platforms.MacCatalyst.MacIdiomControlStyle.Configure();
+                Platforms.MacCatalyst.ContextMenuSupport.Configure();
 #endif
             });
 

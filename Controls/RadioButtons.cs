@@ -38,6 +38,7 @@ public sealed class RadioButtons : VerticalStackLayout
 
 	private readonly ObservableCollection<RadioButton> _items = new();
 	private readonly Label _headerLabel;
+	private readonly List<AccessibleItemView> _itemViews = new();
 	private Grid? _itemsGrid;
 	private bool _layoutBuilt;
 	private bool _updatingSelection;
@@ -76,6 +77,8 @@ public sealed class RadioButtons : VerticalStackLayout
 			FontSize = 14,
 			Margin = new Thickness(0, 0, 0, 2),
 		};
+		// The group's caption, a heading to VoiceOver.
+		SemanticProperties.SetHeadingLevel(_headerLabel, SemanticHeadingLevel.Level3);
 		base.Children.Add(_headerLabel);
 
 		Loaded += OnLoaded;
@@ -117,11 +120,24 @@ public sealed class RadioButtons : VerticalStackLayout
 			rb.GroupName = groupName;
 			rb.CheckedChanged += OnRadioButtonCheckedChanged;
 
+			// A radio choice to the keyboard and VoiceOver: the group is one Tab stop, the arrow
+			// keys select the neighbouring choice, Space selects the focused one.
+			var item = new AccessibleItemView
+			{
+				Role = AccessibleItemRole.RadioButton,
+				FocusGroup = groupName,
+				IsSelected = rb.IsChecked,
+				Content = rb,
+			};
+			item.Invoked += (_, _) => rb.IsChecked = true;
+			item.MoveRequested += (_, args) => args.Handled = MoveSelection(rb, args.Delta);
+			_itemViews.Add(item);
+
 			int row = i / maxCols;
 			int col = i % maxCols;
-			Grid.SetRow(rb, row);
-			Grid.SetColumn(rb, col);
-			_itemsGrid.Children.Add(rb);
+			Grid.SetRow(item, row);
+			Grid.SetColumn(item, col);
+			_itemsGrid.Children.Add(item);
 		}
 
 		base.Children.Add(_itemsGrid);
@@ -134,8 +150,26 @@ public sealed class RadioButtons : VerticalStackLayout
 		}
 	}
 
+	private bool MoveSelection(RadioButton from, int delta)
+	{
+		var index = _items.IndexOf(from) + delta;
+		if (index < 0 || index >= _items.Count)
+		{
+			return false;
+		}
+
+		_items[index].IsChecked = true;
+		AccessibleItemFocus.MoveTo(_itemViews[index]);
+		return true;
+	}
+
 	private void OnRadioButtonCheckedChanged(object? sender, CheckedChangedEventArgs e)
 	{
+		if (sender is RadioButton changed && _items.IndexOf(changed) is var changedIndex && changedIndex >= 0 && changedIndex < _itemViews.Count)
+		{
+			_itemViews[changedIndex].IsSelected = e.Value;
+		}
+
 		if (_updatingSelection || sender is not RadioButton rb || !e.Value)
 			return;
 

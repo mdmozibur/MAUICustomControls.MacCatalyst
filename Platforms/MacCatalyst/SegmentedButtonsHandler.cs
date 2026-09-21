@@ -40,7 +40,7 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
             TextAlignment = UITextAlignment.Left,
         };
 
-        _segmentedControl = new UISegmentedControl();
+        _segmentedControl = new KeyboardSegmentedControl();
         _segmentedControl.ValueChanged += OnValueChanged;
 
         return new UIStackView([_headerLabel, _segmentedControl])
@@ -150,6 +150,15 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
         handler._headerLabel.TextColor = ResolveTextColor(control);
         handler._headerLabel.Hidden = string.IsNullOrWhiteSpace(header);
 
+        // VoiceOver reads the header as the segments' group name; the caption itself is not read twice.
+        handler._headerLabel.IsAccessibilityElement = false;
+        if (handler._segmentedControl is not null)
+        {
+            handler._segmentedControl.AccessibilityLabel = string.IsNullOrWhiteSpace(header)
+                ? Microsoft.Maui.Controls.SemanticProperties.GetDescription(control)
+                : header;
+        }
+
         ((IView)control).InvalidateMeasure();
     }
 
@@ -256,5 +265,43 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
         VirtualView.SelectedIndex = _segmentedControl.SelectedSegment == NoSelectedSegment
             ? -1
             : (int)_segmentedControl.SelectedSegment;
+    }
+}
+
+/// <summary>
+/// The segments as UWP's SegmentedButtons answer the keyboard: with keyboard focus (keyboard
+/// navigation on), ← and → select the previous or next segment, as a click would.
+/// </summary>
+internal sealed class KeyboardSegmentedControl : UISegmentedControl
+{
+    private readonly HashSet<UIKeyboardHidUsage> _swallowed = new();
+
+    public override void PressesBegan(NSSet<UIPress> presses, UIPressesEvent evt)
+    {
+        if (Focused && Enabled && KeyboardKeys.KeyOf(presses) is { } key
+            && key is UIKeyboardHidUsage.KeyboardLeftArrow or UIKeyboardHidUsage.KeyboardRightArrow)
+        {
+            _swallowed.Add(key);
+            var next = (int)SelectedSegment + (key == UIKeyboardHidUsage.KeyboardLeftArrow ? -1 : 1);
+            if (next >= 0 && next < NumberOfSegments && next != SelectedSegment)
+            {
+                SelectedSegment = next;
+                SendActionForControlEvents(UIControlEvent.ValueChanged);
+            }
+
+            return;
+        }
+
+        base.PressesBegan(presses, evt);
+    }
+
+    public override void PressesEnded(NSSet<UIPress> presses, UIPressesEvent evt)
+    {
+        if (KeyboardKeys.KeyOf(presses, withoutModifiers: false) is { } key && _swallowed.Remove(key))
+        {
+            return;
+        }
+
+        base.PressesEnded(presses, evt);
     }
 }

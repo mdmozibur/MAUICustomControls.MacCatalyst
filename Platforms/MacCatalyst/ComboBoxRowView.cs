@@ -81,10 +81,17 @@ internal sealed class ComboBoxRowView : UIControl
             IsHighlighted = false;
     }
 
+    // Highlight and selection take the tint: the system accent, as WinUI's list selection does.
     private void UpdateBackground() =>
         BackgroundColor = _isHighlighted
-            ? UIColor.SystemBlue.ColorWithAlpha(0.18f)
+            ? TintColor.ColorWithAlpha(0.18f)
             : _isSelected
-                ? UIColor.SystemBlue.ColorWithAlpha(0.10f)
+                ? TintColor.ColorWithAlpha(0.10f)
                 : UIColor.Clear;
+
+    public override void TintColorDidChange()
+    {
+        base.TintColorDidChange();
+        UpdateBackground();
+    }
 }

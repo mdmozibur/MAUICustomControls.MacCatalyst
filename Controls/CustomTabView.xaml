@@ -93,7 +93,6 @@
             x:Name="TabScrollView"
             Grid.Column="1"
             Orientation="Horizontal"
-            Padding="0,-40,0,0"
             HorizontalScrollBarVisibility="Never"
             VerticalScrollBarVisibility="Never">
             <HorizontalStackLayout x:Name="TabHost" Spacing="0" />

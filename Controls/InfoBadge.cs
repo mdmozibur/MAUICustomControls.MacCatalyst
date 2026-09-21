@@ -136,7 +136,8 @@ public sealed class InfoBadge : ContentView
     public InfoBadge()
     {
         InputTransparent = true;
-        Background = new SolidColorBrush(Color.FromArgb("#0078D4"));
+        // The fill is the app's InfoBadgeBackground theme resource (the system accent), set by the
+        // implicit InfoBadge style in the converted app's UwpCompatResources.xaml.
 
         _valueLabel = new Label
         {

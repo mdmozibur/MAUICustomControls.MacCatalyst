@@ -54,11 +54,12 @@ public sealed class PopoverButton : ContentView
 	}
 
 	public static readonly BindableProperty TextColorProperty =
-		BindableProperty.Create(nameof(TextColor), typeof(Color), typeof(PopoverButton), Colors.Black, propertyChanged: OnButtonFaceChanged);
+		BindableProperty.Create(nameof(TextColor), typeof(Color), typeof(PopoverButton), null, propertyChanged: OnButtonFaceChanged);
 
-	public Color TextColor
+	/// <summary>Text colour of the button face; null follows the theme (the app's Label style).</summary>
+	public Color? TextColor
 	{
-		get => (Color)GetValue(TextColorProperty);
+		get => (Color?)GetValue(TextColorProperty);
 		set => SetValue(TextColorProperty, value);
 	}
 
@@ -114,6 +115,16 @@ public sealed class PopoverButton : ContentView
 	{
 		get => (PopoverDirection)GetValue(PopoverDirectionProperty);
 		set => SetValue(PopoverDirectionProperty, value);
+	}
+
+	public static readonly BindableProperty PopoverAlignmentProperty =
+		BindableProperty.Create(nameof(PopoverAlignment), typeof(PopoverAlignment), typeof(PopoverButton), PopoverAlignment.Center);
+
+	/// <summary>Where the popover lines up along the side it opens on (XAML's *EdgeAligned* placements).</summary>
+	public PopoverAlignment PopoverAlignment
+	{
+		get => (PopoverAlignment)GetValue(PopoverAlignmentProperty);
+		set => SetValue(PopoverAlignmentProperty, value);
 	}
 
 	public static readonly BindableProperty PopoverCornerRadiusProperty =
@@ -253,14 +264,20 @@ public sealed class PopoverButton : ContentView
 
 	private Label CreateLabel(string text)
 	{
-		return new Label
+		var label = new Label
 		{
 			Text = text,
 			FontAttributes = FontAttributes,
 			FontSize = FontSize,
 			FontFamily = FontFamily,
-			TextColor = TextColor,
 			VerticalOptions = LayoutOptions.Center,
 		};
+
+		if (TextColor is not null)
+		{
+			label.TextColor = TextColor;
+		}
+
+		return label;
 	}
 }
