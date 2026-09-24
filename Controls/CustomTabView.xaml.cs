@@ -189,6 +189,13 @@ public partial class CustomTabView : Grid
 
         var args = e!;
 
+        // UWP's tab strip (Reorder/Content/Entrance item transitions): tabs that shift glide from
+        // where they were, a new tab fades and slides in. A reset rebuilds without motion.
+        if (args.Action != NotifyCollectionChangedAction.Reset)
+        {
+            TabMotion.CapturePositions(TabHost);
+        }
+
         switch (args.Action)
         {
             case NotifyCollectionChangedAction.Add:
@@ -223,6 +230,11 @@ public partial class CustomTabView : Grid
             var tabItem = CreateTabItem();
             ConfigureTabItem(tabItem, item);
             AttachTab(tabItem);
+            if (IsLoaded)
+            {
+                TabMotion.PrepareEntrance(tabItem);
+            }
+
             tabHost.Children.Insert(index++, tabItem);
         }
     }
@@ -360,6 +372,7 @@ public partial class CustomTabView : Grid
         tabItem.CloseRequested += TabItem_CloseRequested;
         tabItem.DuplicateRequested += TabItem_DuplicateRequested;
         tabItem.MoveRequested += TabItem_MoveRequested;
+        TabMotion.Track(tabItem);
     }
 
     private void DetachTab(TabItem tabItem)
@@ -368,6 +381,7 @@ public partial class CustomTabView : Grid
         tabItem.CloseRequested -= TabItem_CloseRequested;
         tabItem.DuplicateRequested -= TabItem_DuplicateRequested;
         tabItem.MoveRequested -= TabItem_MoveRequested;
+        TabMotion.Untrack(tabItem);
     }
 
     // ← or → on a focused tab selects its neighbour, and keyboard focus follows.
@@ -430,5 +444,126 @@ public partial class CustomTabView : Grid
     private void AddButton_Click(object? sender, EventArgs e)
     {
         AddButtonClick?.Invoke(this, e);
+    }
+}
+
+/// <summary>
+/// The tab strip's item transitions, as UWP's CustomTabView style declares them
+/// (ReorderThemeTransition, ContentThemeTransition, EntranceThemeTransition without stagger): FLIP
+/// for tabs whose place changes (each is drawn where it was and its offset animated away), a fade and
+/// short slide for a new tab. Off when Reduce Motion is on.
+/// </summary>
+internal static class TabMotion
+{
+    private const uint RepositionMs = 300;
+    private const uint EntranceMs = 500;
+    private const uint EntranceFadeMs = 250;
+    private const double EntranceOffset = 40;
+
+    // UWP's decelerate curve, cubic-bezier(0.1, 0.9, 0.2, 1).
+    private static readonly Easing Decelerate = new(t => Bezier(t, 0.1, 0.9, 0.2, 1.0));
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TabItem, StrongBox> Pending = new();
+
+    private sealed class StrongBox
+    {
+        public double X;
+    }
+
+    private static bool IsReduced =>
+#if MACCATALYST || IOS
+        UIKit.UIAccessibility.IsReduceMotionEnabled;
+#else
+        false;
+#endif
+
+    public static void CapturePositions(Layout tabHost)
+    {
+        if (IsReduced)
+        {
+            return;
+        }
+
+        foreach (var tab in tabHost.Children.OfType<TabItem>().Where(tab => tab.Width > 0))
+        {
+            Pending.AddOrUpdate(tab, new StrongBox { X = tab.X });
+        }
+
+        // Only the layout that follows the change animates; a later one (a window resize) does not.
+        tabHost.Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(150), () =>
+        {
+            foreach (var tab in tabHost.Children.OfType<TabItem>())
+            {
+                Pending.Remove(tab);
+            }
+        });
+    }
+
+    public static void Track(TabItem tab) => tab.PropertyChanged += OnTabPropertyChanged;
+
+    public static void Untrack(TabItem tab)
+    {
+        tab.PropertyChanged -= OnTabPropertyChanged;
+        Pending.Remove(tab);
+    }
+
+    public static void PrepareEntrance(TabItem tab)
+    {
+        if (IsReduced)
+        {
+            return;
+        }
+
+        tab.Opacity = 0;
+        tab.TranslationX = EntranceOffset;
+        void OnSized(object? sender, EventArgs e)
+        {
+            tab.SizeChanged -= OnSized;
+            tab.FadeTo(1, EntranceFadeMs, Easing.Linear);
+            tab.TranslateTo(0, tab.TranslationY, EntranceMs, Decelerate);
+        }
+
+        tab.SizeChanged += OnSized;
+    }
+
+    private static void OnTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(VisualElement.X) || sender is not TabItem tab || !Pending.TryGetValue(tab, out var from))
+        {
+            return;
+        }
+
+        Pending.Remove(tab);
+        var delta = from.X - tab.X;
+        if (Math.Abs(delta) < 0.5)
+        {
+            return;
+        }
+
+        tab.CancelAnimations();
+        tab.TranslationX += delta;
+        tab.TranslateTo(0, tab.TranslationY, RepositionMs, Decelerate);
+    }
+
+    // y of a CSS cubic-bezier at x = t (Newton iterations on x, then y).
+    private static double Bezier(double t, double x1, double y1, double x2, double y2)
+    {
+        static double Curve(double u, double a, double b) => 3 * a * u * (1 - u) * (1 - u) + 3 * b * u * u * (1 - u) + u * u * u;
+        static double Slope(double u, double a, double b) => 3 * a * (1 - u) * (1 - u) + 6 * (b - a) * u * (1 - u) + 3 * (1 - b) * u * u;
+
+        var u = t;
+        for (var i = 0; i < 8; i++)
+        {
+            var slope = Slope(u, x1, x2);
+            if (Math.Abs(slope) < 1e-6)
+            {
+                break;
+            }
+
+            u -= (Curve(u, x1, x2) - t) / slope;
+            u = Math.Clamp(u, 0, 1);
+        }
+
+        return Curve(u, y1, y2);
     }
 }

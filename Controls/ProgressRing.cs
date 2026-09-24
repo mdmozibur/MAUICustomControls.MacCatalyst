@@ -49,6 +49,15 @@ public sealed class ProgressRing : View
         typeof(ProgressRing),
         null);
 
+    // WinUI's ProgressRing style centres the ring in its slot at its 32 pt default size; a MAUI view
+    // would fill the slot instead, and the ring drew as large as the export preview. XAML that sets
+    // an alignment still overrides these.
+    public ProgressRing()
+    {
+        HorizontalOptions = LayoutOptions.Center;
+        VerticalOptions = LayoutOptions.Center;
+    }
+
     public bool IsActive
     {
         get => (bool)GetValue(IsActiveProperty);

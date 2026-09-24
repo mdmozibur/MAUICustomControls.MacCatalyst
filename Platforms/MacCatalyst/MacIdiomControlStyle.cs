@@ -54,16 +54,38 @@ public static class MacIdiomControlStyle
         Apply(button);
         if (copyAppearanceProxy)
         {
-            foreach (var state in new[] { UIControlState.Normal, UIControlState.Highlighted, UIControlState.Disabled })
+            // A new button has none of these, so only what the proxy actually sets is copied.
+            foreach (var (state, titleColor, titleShadowColor, backgroundImage) in AppearanceProxyValues.Value)
             {
-                button.SetTitleColor(UIButton.Appearance.TitleColor(state), state);
-                button.SetTitleShadowColor(UIButton.Appearance.TitleShadowColor(state), state);
-                button.SetBackgroundImage(UIButton.Appearance.BackgroundImageForState(state), state);
+                if (titleColor is not null)
+                {
+                    button.SetTitleColor(titleColor, state);
+                }
+
+                if (titleShadowColor is not null)
+                {
+                    button.SetTitleShadowColor(titleShadowColor, state);
+                }
+
+                if (backgroundImage is not null)
+                {
+                    button.SetBackgroundImage(backgroundImage, state);
+                }
             }
         }
 
         return button;
     }
+
+    // The UIButton appearance proxy's per-state values, read once: querying the proxy costs nine
+    // Objective-C round trips per button, and the app sets the proxy (if at all) before any button.
+    private static readonly Lazy<(UIControlState State, UIColor? TitleColor, UIColor? TitleShadowColor, UIImage? BackgroundImage)[]> AppearanceProxyValues =
+        new(() => new[] { UIControlState.Normal, UIControlState.Highlighted, UIControlState.Disabled }
+            .Select(state => (state,
+                (UIColor?)UIButton.Appearance.TitleColor(state),
+                (UIColor?)UIButton.Appearance.TitleShadowColor(state),
+                (UIImage?)UIButton.Appearance.BackgroundImageForState(state)))
+            .ToArray());
 
     public static void Apply(UIButton button)
     {

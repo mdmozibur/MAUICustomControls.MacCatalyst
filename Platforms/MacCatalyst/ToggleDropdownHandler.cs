@@ -41,26 +41,63 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         [nameof(IView.Semantics)] = (handler, view) =>
         {
             ViewHandler.MapSemantics(handler, view);
-            UpdateAccessibility(handler.PlatformView, view);
+            if (!handler._settingVirtualView)
+            {
+                UpdateAccessibility(handler.PlatformView, view);
+            }
         },
         ["ToolTip"] = (handler, view) =>
         {
             ViewHandler.MapToolTip(handler, view);
-            UpdateAccessibility(handler.PlatformView, view);
+            if (!handler._settingVirtualView)
+            {
+                UpdateAccessibility(handler.PlatformView, view);
+            }
         },
     };
 
     public static new void MapIsEnabled(IViewHandler handler, IView view)
     {
         ViewHandler.MapIsEnabled(handler, view);
-        if (handler is ToggleDropdownHandler { PlatformView: { } button } && view is ToggleDropdown dropdown)
+        if (handler is ToggleDropdownHandler dropdownHandler && view is ToggleDropdown dropdown)
         {
-            UpdateButtonAppearance(button, dropdown);
+            dropdownHandler.RefreshAppearance(dropdown);
         }
     }
 
     private PointerHoverTracker? _hover;
     private UIImageView? _indicatorView;
+
+    // Set while MAUI maps every property of a new virtual view. Nearly every mapping rebuilds the
+    // whole button (configuration, glyph image, accessibility), so a new dropdown was rebuilt about
+    // 27 times; during that pass the mappings only mark it, and SetVirtualView rebuilds it once.
+    private bool _settingVirtualView;
+
+    public override void SetVirtualView(IView view)
+    {
+        _settingVirtualView = true;
+        try
+        {
+            base.SetVirtualView(view);
+        }
+        finally
+        {
+            _settingVirtualView = false;
+        }
+
+        if (PlatformView is { } button && VirtualView is { } dropdown)
+        {
+            UpdateButtonAppearance(button, dropdown);
+        }
+    }
+
+    private void RefreshAppearance(ToggleDropdown view)
+    {
+        if (!_settingVirtualView && PlatformView is { } button)
+        {
+            UpdateButtonAppearance(button, view);
+        }
+    }
 
     public ToggleDropdownHandler() : base(PropertyMapper)
     {
@@ -93,7 +130,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
             _indicatorView.CenterYAnchor.ConstraintEqualTo(platformView.CenterYAnchor),
         });
 
-        UpdateButtonAppearance(platformView, VirtualView);
+        RefreshAppearance(VirtualView);
     }
 
     protected override void DisconnectHandler(UIButton platformView)
@@ -230,7 +267,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
 
     public static void MapText(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     // UIButton keeps its own subviews ordered; reposition the indicator after every appearance change.
@@ -262,72 +299,72 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
 
     public static void MapPadding(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapFontSize(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapSpacing(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapOrientation(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapHorizontalContentAlignment(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapBorderThickness(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapIconFontSize(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapIconFontWeight(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapSelectedOption(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapIsSelected(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapColor(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapIsActionMenu(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapIcon(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     private static void VirtualView_Options_CollectionChanged(ToggleDropdownHandler handler, ToggleDropdown view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     // VoiceOver: a toggle (an action menu is a plain button) named by its text or, icon-only, its
@@ -496,9 +533,25 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         return UIImage.GetSystemImage(systemIconName, config)?.ImageWithRenderingMode(UIImageRenderingMode.AlwaysTemplate);
     }
 
+    // Rendered glyphs by glyph, font, size and attributes: template images are tinted where they are
+    // shown, so one image serves every button, state and theme that uses the same glyph.
+    private static readonly Dictionary<(string Glyph, string FontFamily, double FontSize, FontAttributes Attributes), UIImage?> GlyphImages = new();
+
     // Glyphs are rendered once as template images: the button and menu tint them with the current
     // (dynamic) foreground, so checked/unchecked and light/dark need no re-rendering.
     private static UIImage? CreateFontGlyphImage(string glyph, string fontFamily, double fontSize, FontAttributes fontAttributes)
+    {
+        var key = (glyph, fontFamily, fontSize, fontAttributes);
+        if (!GlyphImages.TryGetValue(key, out var image))
+        {
+            image = RenderFontGlyphImage(glyph, fontFamily, fontSize, fontAttributes);
+            GlyphImages[key] = image;
+        }
+
+        return image;
+    }
+
+    private static UIImage? RenderFontGlyphImage(string glyph, string fontFamily, double fontSize, FontAttributes fontAttributes)
     {
         var resolvedFontSize = (nfloat)Math.Max(fontSize > 0 ? fontSize : 16d, 6d);
         var font = ResolvePlatformFont(fontFamily, resolvedFontSize) ?? UIFont.SystemFontOfSize(resolvedFontSize);

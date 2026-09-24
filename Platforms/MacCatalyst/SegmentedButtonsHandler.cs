@@ -14,6 +14,8 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
 
     private UILabel? _headerLabel;
     private UISegmentedControl? _segmentedControl;
+    private PointerHoverTracker? _hoverTracker;
+    private UIView? _hoverOverlay;
 
     public static readonly IPropertyMapper<SegmentedButtons, SegmentedButtonsHandler> Mapper =
         new PropertyMapper<SegmentedButtons, SegmentedButtonsHandler>(ViewMapper)
@@ -55,6 +57,19 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
     protected override void ConnectHandler(UIStackView platformView)
     {
         base.ConnectHandler(platformView);
+
+        // UWP's SegmentedButtonItem PointerOver state: the hovered segment, unless it is the selected
+        // one, gets the ButtonBackgroundPointerOver fill. The native control already shows Pressed.
+        // The overlay lies over the control (a native Mac segmented control draws above its own
+        // subviews) and takes no clicks.
+        if (_segmentedControl is not null)
+        {
+            _hoverOverlay = new UIView { UserInteractionEnabled = false, Hidden = true };
+            _hoverOverlay.Layer.CornerRadius = 4;
+            platformView.AddSubview(_hoverOverlay);
+            _hoverTracker = new PointerHoverTracker(_segmentedControl, UpdateHoverOverlay, tracksLocation: true);
+        }
+
         MapItems(this, VirtualView);
         MapHeader(this, VirtualView);
         MapTextStyle(this, VirtualView);
@@ -68,6 +83,11 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
         {
             _segmentedControl.ValueChanged -= OnValueChanged;
         }
+
+        _hoverTracker?.Dispose();
+        _hoverTracker = null;
+        _hoverOverlay?.RemoveFromSuperview();
+        _hoverOverlay = null;
 
         base.DisconnectHandler(platformView);
     }
@@ -169,7 +189,76 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
             handler._segmentedControl.SelectedSegment = control.SelectedIndex >= 0
                 ? control.SelectedIndex
                 : NoSelectedSegment;
+            FocusRing.UpdateSystemControl(handler._segmentedControl, control);
         }
+
+        handler.UpdateHoverOverlay();
+    }
+
+    private void UpdateHoverOverlay()
+    {
+        if (_hoverOverlay is null || _segmentedControl is not { } control || _hoverTracker is null)
+        {
+            return;
+        }
+
+        var index = _hoverTracker.IsHovered && control.Enabled ? SegmentAt(control, _hoverTracker.Location.X) : NoSelectedSegment;
+        if (index == NoSelectedSegment || index == control.SelectedSegment)
+        {
+            _hoverOverlay.Hidden = true;
+            return;
+        }
+
+        var frame = SegmentFrame(control, index);
+        _hoverOverlay.Frame = control.ConvertRectToView(frame.Inset(1, 1), PlatformView);
+        _hoverOverlay.BackgroundColor = InteractionColors.PointerOver();
+        _hoverOverlay.Hidden = false;
+    }
+
+    private static nint SegmentAt(UISegmentedControl control, nfloat x)
+    {
+        var count = control.NumberOfSegments;
+        for (nint index = 0; index < count; index++)
+        {
+            var frame = SegmentFrame(control, index);
+            if (x >= frame.Left && x < frame.Right)
+            {
+                return index;
+            }
+        }
+
+        return NoSelectedSegment;
+    }
+
+    // A segment's frame in the control: its set width, or an equal share of what the set widths leave.
+    private static CGRect SegmentFrame(UISegmentedControl control, nint index)
+    {
+        var count = control.NumberOfSegments;
+        nfloat fixedWidth = 0;
+        var automatic = 0;
+        for (nint i = 0; i < count; i++)
+        {
+            var width = control.SegmentWidth(i);
+            if (width > 0)
+            {
+                fixedWidth += width;
+            }
+            else
+            {
+                automatic++;
+            }
+        }
+
+        var share = automatic == 0 ? 0 : (control.Bounds.Width - fixedWidth) / automatic;
+        nfloat left = 0;
+        for (nint i = 0; i < index; i++)
+        {
+            var width = control.SegmentWidth(i);
+            left += width > 0 ? width : share;
+        }
+
+        var own = control.SegmentWidth(index);
+        return new CGRect(left, 0, own > 0 ? own : share, control.Bounds.Height);
     }
 
     private static void MapTextStyle(SegmentedButtonsHandler handler, SegmentedButtons control)
@@ -265,6 +354,7 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
         VirtualView.SelectedIndex = _segmentedControl.SelectedSegment == NoSelectedSegment
             ? -1
             : (int)_segmentedControl.SelectedSegment;
+        UpdateHoverOverlay();
     }
 }
 

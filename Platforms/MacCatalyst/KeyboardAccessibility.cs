@@ -419,6 +419,31 @@ internal static class ButtonAccessibility
                 ? text
                 : Microsoft.Maui.Controls.ToolTipProperties.GetText(element)?.ToString();
         button.AccessibilityHint = Microsoft.Maui.Controls.SemanticProperties.GetHint(element);
+        AccessibleButton.MakeSingleElement(button);
+    }
+}
+
+/// <summary>
+/// A UIButton read as one element: VoiceOver on the Mac otherwise also lists its title label (for an
+/// icon-font button, the glyph's letter) and image view as children of the named button.
+/// </summary>
+internal static class AccessibleButton
+{
+    public static void MakeSingleElement(UIView view)
+    {
+        view.IsAccessibilityElement = true;
+        if (view is UIButton button)
+        {
+            if (button.TitleLabel is { } title)
+            {
+                title.IsAccessibilityElement = false;
+            }
+
+            if (button.ImageView is { } image)
+            {
+                image.IsAccessibilityElement = false;
+            }
+        }
     }
 }
 
@@ -450,6 +475,11 @@ public static class IconButtonNames
 
     private static void Apply(UIView? platformView, IView view)
     {
+        if (platformView is not null)
+        {
+            AccessibleButton.MakeSingleElement(platformView);
+        }
+
         if (platformView is null || view is not Microsoft.Maui.Controls.VisualElement element
             || !string.IsNullOrWhiteSpace(Microsoft.Maui.Controls.SemanticProperties.GetDescription(element)))
         {

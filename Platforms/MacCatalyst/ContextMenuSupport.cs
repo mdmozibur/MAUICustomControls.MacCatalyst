@@ -39,9 +39,47 @@ public static class ContextMenuSupport
             platformView.RemoveInteraction(interaction);
         }
 
-        if (view is IContextFlyoutElement { ContextFlyout: IMenuFlyout })
+        if (view is IContextFlyoutElement { ContextFlyout: IMenuFlyout flyout })
         {
             platformView.AddInteraction(new ContextFlyoutInteraction(new ContextMenuDelegate(view, mauiContext)));
+            Prewarm(flyout, mauiContext);
+        }
+    }
+
+    // The menu is built synchronously when the secondary click arrives, so its first build pays for
+    // font loading, glyph drawing and first-run code. Doing one build when the app is idle moves that
+    // cost off the click. Opening is not raised here; hidden items only change which icons get drawn.
+    private static void Prewarm(IMenuFlyout flyout, IMauiContext mauiContext)
+    {
+        var weakFlyout = new WeakReference<IMenuFlyout>(flyout);
+        NSTimer.CreateScheduledTimer(0.5, false, timer =>
+            {
+                if (!weakFlyout.TryGetTarget(out var target))
+                {
+                    return;
+                }
+
+                foreach (var item in AllItems(target))
+                {
+                    LoadIcon(item.Source, mauiContext);
+                }
+
+                _ = UIMenu.Create(string.Empty, null, UIMenuIdentifier.None, 0, BuildMenuElements(target, mauiContext));
+            });
+    }
+
+    private static IEnumerable<IMenuElement> AllItems(IEnumerable<IMenuElement> items)
+    {
+        foreach (var item in items)
+        {
+            yield return item;
+            if (item is IMenuFlyoutSubItem subItem)
+            {
+                foreach (var child in AllItems(subItem))
+                {
+                    yield return child;
+                }
+            }
         }
     }
 
@@ -131,18 +169,33 @@ public static class ContextMenuSupport
         {
             case IFontImageSource { Glyph.Length: > 0 } fontSource:
             {
-                var fontManager = mauiContext.Services.GetService(typeof(IFontManager)) as IFontManager;
-                // Menu icons have a fixed size on the Mac; the XAML size was chosen for a UWP menu.
-                var font = fontManager?.GetFont(fontSource.Font.WithSize(MenuIconPointSize)) ?? UIFont.SystemFontOfSize((nfloat)MenuIconPointSize);
-                var text = new NSAttributedString(fontSource.Glyph, new UIStringAttributes { Font = font, ForegroundColor = UIColor.Black });
-                var size = text.Size;
-                if (size.Width <= 0 || size.Height <= 0)
+                var key = (fontSource.Glyph, fontSource.Font.Family, fontSource.Font.Weight, fontSource.Font.Slant);
+                lock (FontIcons)
                 {
-                    return null;
+                    if (FontIcons.TryGetValue(key, out var cached))
+                    {
+                        return cached;
+                    }
                 }
 
-                var renderer = new UIGraphicsImageRenderer(new CGSize(Math.Ceiling((double)size.Width), Math.Ceiling((double)size.Height)));
-                return renderer.CreateImage(_ => text.DrawString(CGPoint.Empty)).ImageWithRenderingMode(UIImageRenderingMode.AlwaysTemplate);
+                _fontManager ??= mauiContext.Services.GetService(typeof(IFontManager)) as IFontManager;
+                // Menu icons have a fixed size on the Mac; the XAML size was chosen for a UWP menu.
+                var font = _fontManager?.GetFont(fontSource.Font.WithSize(MenuIconPointSize)) ?? UIFont.SystemFontOfSize((nfloat)MenuIconPointSize);
+                var text = new NSAttributedString(fontSource.Glyph, new UIStringAttributes { Font = font, ForegroundColor = UIColor.Black });
+                var size = text.Size;
+                UIImage? image = null;
+                if (size.Width > 0 && size.Height > 0)
+                {
+                    var renderer = new UIGraphicsImageRenderer(new CGSize(Math.Ceiling((double)size.Width), Math.Ceiling((double)size.Height)));
+                    image = renderer.CreateImage(_ => text.DrawString(CGPoint.Empty)).ImageWithRenderingMode(UIImageRenderingMode.AlwaysTemplate);
+                }
+
+                lock (FontIcons)
+                {
+                    FontIcons[key] = image;
+                }
+
+                return image;
             }
 
             case IFileImageSource { File.Length: > 0 } fileSource:
@@ -154,6 +207,11 @@ public static class ContextMenuSupport
     }
 
     private const double MenuIconPointSize = 13;
+
+    // Template images are tinted by the menu, so one image per glyph and font serves every menu,
+    // state and theme. Drawing them all on each open delayed the first right-click noticeably.
+    private static readonly Dictionary<(string Glyph, string? Family, FontWeight Weight, FontSlant Slant), UIImage?> FontIcons = new();
+    private static IFontManager? _fontManager;
 
     private sealed class ContextMenuDelegate : UIContextMenuInteractionDelegate
     {
@@ -178,9 +236,12 @@ public static class ContextMenuSupport
 
             // UWP raises Opening before showing the menu; handlers adjust the items from the
             // current selection. Build afterwards so the menu reflects their changes.
+            var __sw = System.Diagnostics.Stopwatch.StartNew(); // TEMP timing
             (flyout as ContextMenuFlyout)?.RaiseOpening();
+            var __opening = __sw.ElapsedMilliseconds;
 
             var elements = BuildMenuElements(flyout, _mauiContext);
+            Console.WriteLine($"[ctxmenu-timing] opening={__opening}ms build={__sw.ElapsedMilliseconds - __opening}ms"); // TEMP timing
             if (elements.Length == 0)
             {
                 // Every item hidden: UWP shows nothing (and raises no Closed).
@@ -272,6 +333,155 @@ public static class MenuBarVisibility
             {
                 builder.ReplaceChildrenOfMenu(RawIdentifier(menu), children => Filter(children, hidden));
             }
+        }
+    }
+
+    /// <summary>
+    /// Puts back the page menus UIKit refused. UIKit silently drops a menu holding a key command
+    /// whose shortcut the menu bar already has, so one clash loses a whole menu: MAUI merges the
+    /// page's File items into the system File menu as one section, and Open File (Cmd-O, against
+    /// File > Open…) or Export (Cmd-E, against Edit > Find > Use Selection for Find) took Save,
+    /// Export and Print with it. Call right after MAUI has added the page's menus. A refused menu
+    /// is merged again with its visible items only; where a page shortcut still clashes, the page's
+    /// command keeps it and the system command goes, as the app's own accelerator wins on Windows.
+    /// </summary>
+    public static void MergeRefusedPageMenus(IUIMenuBuilder builder)
+    {
+        var window = Microsoft.Maui.Controls.Application.Current?.Windows.FirstOrDefault();
+        if ((window as IMenuBarElement)?.MenuBar is not { } menuBar)
+        {
+            return;
+        }
+
+        string? previousIdentifier = null;
+        foreach (var menuBarItem in menuBar)
+        {
+            if (PlatformElement(menuBarItem) is not UIMenu menu || RawIdentifier(menu) is not { Length: > 0 } identifier)
+            {
+                continue;
+            }
+
+            var visible = VisibleElements(menuBarItem);
+            if (MenuVisibility.IsHidden(menuBarItem) || visible.Length == 0 || ContainsAny(builder, visible))
+            {
+                previousIdentifier = identifier;
+                continue;
+            }
+
+            foreach (var command in KeyCommands(visible))
+            {
+                RemoveSystemShortcut(builder, command);
+            }
+
+            // The page's own menu (Settings) is a menu of its own; File, Edit or View merge into the
+            // system menu of that name as a section at its start, as MAUI does.
+            var isSystemMenu = builder.GetMenu(identifier) is not null
+                && identifier.StartsWith("com.apple.menu.", StringComparison.Ordinal)
+                && !identifier.StartsWith("com.apple.menu.dynamic.", StringComparison.Ordinal);
+            if (isSystemMenu)
+            {
+                builder.InsertChildMenuAtStart(UIMenu.Create(string.Empty, null, UIMenuIdentifier.None, UIMenuOptions.DisplayInline, visible), identifier);
+            }
+            else if (previousIdentifier is not null)
+            {
+                builder.InsertSiblingMenuAfter(menu.GetMenuByReplacingChildren(visible), previousIdentifier);
+            }
+            else
+            {
+                builder.InsertSiblingMenuBefore(menu.GetMenuByReplacingChildren(visible), UIMenuIdentifier.Window.GetConstant());
+            }
+
+            if (isSystemMenu && !ContainsAny(builder, visible))
+            {
+                // Still refused (two page items sharing a shortcut): keep every item UIKit accepts.
+                foreach (var element in visible)
+                {
+                    builder.InsertChildMenuAtEnd(UIMenu.Create(string.Empty, null, UIMenuIdentifier.None, UIMenuOptions.DisplayInline, [element]), identifier);
+                    if (!ContainsAny(builder, [element]))
+                    {
+                        Console.WriteLine($"MenuBarVisibility: the menu bar refused '{element.Title}' (its shortcut is taken)");
+                    }
+                }
+            }
+
+            if (builder.GetMenu(identifier) is not null)
+            {
+                previousIdentifier = identifier;
+            }
+        }
+    }
+
+    // The platform elements of a menu's visible items; a visible submenu keeps only its visible items.
+    private static UIMenuElement[] VisibleElements(IEnumerable<IMenuElement> items)
+    {
+        var result = new List<UIMenuElement>();
+        foreach (var item in items)
+        {
+            if (MenuVisibility.IsHidden(item) || PlatformElement(item) is not { } element)
+            {
+                continue;
+            }
+
+            if (item is IMenuFlyoutSubItem subItem && element is UIMenu submenu)
+            {
+                var children = VisibleElements(subItem);
+                if (children.Length > 0)
+                {
+                    result.Add(submenu.GetMenuByReplacingChildren(children));
+                }
+
+                continue;
+            }
+
+            result.Add(element);
+        }
+
+        return result.ToArray();
+    }
+
+    private static IEnumerable<UIKeyCommand> KeyCommands(IEnumerable<UIMenuElement> elements) =>
+        elements.SelectMany(Flatten).OfType<UIKeyCommand>();
+
+    // Whether any of the page's elements made it onto the menu bar.
+    private static bool ContainsAny(IUIMenuBuilder builder, UIMenuElement[] elements)
+    {
+        var keys = elements.SelectMany(Flatten).Select(Key).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        return builder.GetMenu(UIMenuIdentifier.Root.GetConstant()) is { } root
+            && root.Children.SelectMany(Flatten).Any(element => Key(element) is { } key && keys.Contains(key));
+    }
+
+    private static IEnumerable<UIMenuElement> Flatten(UIMenuElement element)
+    {
+        yield return element;
+        if (element is UIMenu menu)
+        {
+            foreach (var child in menu.Children.SelectMany(Flatten))
+            {
+                yield return child;
+            }
+        }
+    }
+
+    // Takes a system command with the page command's shortcut off the menu bar. Page commands carry
+    // MAUI's property list; the system's own do not.
+    private static void RemoveSystemShortcut(IUIMenuBuilder builder, UIKeyCommand pageCommand)
+    {
+        if (builder.GetMenu(UIMenuIdentifier.Root.GetConstant()) is not { } root)
+        {
+            return;
+        }
+
+        foreach (var menu in root.Children.SelectMany(Flatten).OfType<UIMenu>().ToList())
+        {
+            var clashing = menu.Children.OfType<UIKeyCommand>()
+                .Where(command => command.PropertyList is null && command.Input == pageCommand.Input && command.ModifierFlags == pageCommand.ModifierFlags)
+                .ToList();
+            if (clashing.Count == 0 || RawIdentifier(menu) is not { Length: > 0 } identifier)
+            {
+                continue;
+            }
+
+            builder.ReplaceChildrenOfMenu(identifier, children => children.Where(child => !clashing.Contains(child)).ToArray());
         }
     }
 

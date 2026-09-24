@@ -38,6 +38,7 @@ public static class MauiProgram
                 Platforms.MacCatalyst.EntryHandlerCustomization.Configure();
                 Platforms.MacCatalyst.MacIdiomControlStyle.Configure();
                 Platforms.MacCatalyst.ContextMenuSupport.Configure();
+                Platforms.MacCatalyst.ScrollEdgeEffects.Configure();
 #endif
             });
 

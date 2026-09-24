@@ -251,7 +251,8 @@ public static unsafe class AppKitBridge
 
     /// <summary>
     /// Reports the app window's full-screen transitions and screen changes to
-    /// <paramref name="windowEvent"/>. Returns false when the plug-in is missing.
+    /// <paramref name="windowEvent"/>, in addition to any listener installed before. Returns false
+    /// when the plug-in is missing.
     /// </summary>
     public static bool InstallWindowObserver(Action<AppKitWindowEvent> windowEvent)
     {
@@ -260,8 +261,27 @@ public static unsafe class AppKitBridge
             return false;
         }
 
-        _windowEvent = windowEvent;
+        _windowEvent -= windowEvent;
+        _windowEvent += windowEvent;
         return ((delegate* unmanaged<delegate* unmanaged<int, void>, int>)install)(&OnWindowEvent) != 0;
+    }
+
+    /// <summary>
+    /// The CoreGraphics display ID of the screen the app's main window is on (the main screen when
+    /// there is no window). False when the plug-in is missing or there is no screen.
+    /// </summary>
+    public static bool TryGetWindowDisplay(out uint displayId)
+    {
+        displayId = 0;
+        if (!TryGetExport("appkit_get_window_display", out var getDisplay))
+        {
+            return false;
+        }
+
+        uint id;
+        var found = ((delegate* unmanaged<uint*, int>)getDisplay)(&id) != 0;
+        displayId = id;
+        return found;
     }
 
     /// <summary>Quits without asking again.</summary>

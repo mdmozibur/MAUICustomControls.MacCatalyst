@@ -31,18 +31,64 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         [nameof(IView.Semantics)] = (handler, view) =>
         {
             ViewHandler.MapSemantics(handler, view);
-            UpdateAccessibility(handler.PlatformView, view);
+            if (!handler._settingVirtualView)
+            {
+                UpdateAccessibility(handler.PlatformView, view);
+            }
         },
         ["ToolTip"] = (handler, view) =>
         {
             ViewHandler.MapToolTip(handler, view);
-            UpdateAccessibility(handler.PlatformView, view);
+            if (!handler._settingVirtualView)
+            {
+                UpdateAccessibility(handler.PlatformView, view);
+            }
         },
     };
 
     private PointerHoverTracker? _hover;
 
+    // Set while MAUI maps every property of a new virtual view: the content and appearance
+    // mappings each rebuild the button (configuration, glyph bitmap), so they are applied once when
+    // SetVirtualView has mapped everything instead of once per property.
+    private bool _settingVirtualView;
+
     public ToggleButtonHandler() : base(PropertyMapper) { }
+
+    public override void SetVirtualView(IView view)
+    {
+        _settingVirtualView = true;
+        try
+        {
+            base.SetVirtualView(view);
+        }
+        finally
+        {
+            _settingVirtualView = false;
+        }
+
+        if (PlatformView is { } button && VirtualView is { } toggle)
+        {
+            UpdateButtonContent(button, toggle);
+            UpdateButtonAppearance(button, toggle);
+        }
+    }
+
+    private void RefreshContent(ToggleButton view)
+    {
+        if (!_settingVirtualView && PlatformView is { } button)
+        {
+            UpdateButtonContent(button, view);
+        }
+    }
+
+    private void RefreshAppearance(ToggleButton view)
+    {
+        if (!_settingVirtualView && PlatformView is { } button)
+        {
+            UpdateButtonAppearance(button, view);
+        }
+    }
 
     protected override void ConnectHandler(UIButton platformView)
     {
@@ -65,8 +111,8 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
             application.RequestedThemeChanged += OnRequestedThemeChanged;
         }
 
-        UpdateButtonContent(platformView, VirtualView);
-        UpdateButtonAppearance(platformView, VirtualView);
+        RefreshContent(VirtualView);
+        RefreshAppearance(VirtualView);
     }
 
     private void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
@@ -132,59 +178,62 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
             handler.PlatformView.Selected = view.IsChecked;
         }
 
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapText(ToggleButtonHandler handler, ToggleButton view)
     {
-        UpdateButtonContent(handler.PlatformView, view);
-        UpdateAccessibility(handler.PlatformView, view);
+        handler.RefreshContent(view);
+        if (!handler._settingVirtualView)
+        {
+            UpdateAccessibility(handler.PlatformView, view);
+        }
     }
 
     public static void MapFontSize(ToggleButtonHandler handler, ToggleButton view)
     {
-        UpdateButtonContent(handler.PlatformView, view);
+        handler.RefreshContent(view);
     }
 
     public static void MapPadding(ToggleButtonHandler handler, ToggleButton view)
     {
-        UpdateButtonContent(handler.PlatformView, view);
+        handler.RefreshContent(view);
     }
 
     public static void MapHorizontalContentAlignment(ToggleButtonHandler handler, ToggleButton view)
     {
-        UpdateButtonContent(handler.PlatformView, view);
+        handler.RefreshContent(view);
     }
 
     public static void MapBorderThickness(ToggleButtonHandler handler, ToggleButton view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapBorderBrush(ToggleButtonHandler handler, ToggleButton view)
     {
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapColor(ToggleButtonHandler handler, ToggleButton view)
     {
-        UpdateButtonContent(handler.PlatformView, view);
-        UpdateButtonAppearance(handler.PlatformView, view);
+        handler.RefreshContent(view);
+        handler.RefreshAppearance(view);
     }
 
     public static void MapImageSource(ToggleButtonHandler handler, ToggleButton view)
     {
-        UpdateButtonContent(handler.PlatformView, view);
+        handler.RefreshContent(view);
     }
 
     private static void MapImageSpacing(ToggleButtonHandler handler, ToggleButton button)
     {
-        UpdateButtonContent(handler.PlatformView, button);
+        handler.RefreshContent(button);
     }
 
     private static void MapOrientation(ToggleButtonHandler handler, ToggleButton button)
     {
-        UpdateButtonContent(handler.PlatformView, button);
+        handler.RefreshContent(button);
     }
 
     private static void UpdateButtonContent(UIButton button, ToggleButton view)
@@ -314,7 +363,24 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         return image?.ApplyTintColor(tintColor, UIImageRenderingMode.AlwaysOriginal);
     }
 
+    // Rendered glyphs by glyph, font, size and colour (the colour is baked into the bitmap). Buttons
+    // share them: the left pane alone creates a few hundred, most with the same handful of glyphs.
+    private static readonly Dictionary<(string Glyph, string FontFamily, double FontSize, nfloat Red, nfloat Green, nfloat Blue, nfloat Alpha), UIImage?> GlyphImages = new();
+
     private static UIImage? CreateFontGlyphImage(string glyph, string fontFamily, double fontSize, UIColor tintColor)
+    {
+        tintColor.GetRGBA(out var red, out var green, out var blue, out var alpha);
+        var key = (glyph, fontFamily, fontSize, red, green, blue, alpha);
+        if (!GlyphImages.TryGetValue(key, out var image))
+        {
+            image = RenderFontGlyphImage(glyph, fontFamily, fontSize, tintColor);
+            GlyphImages[key] = image;
+        }
+
+        return image;
+    }
+
+    private static UIImage? RenderFontGlyphImage(string glyph, string fontFamily, double fontSize, UIColor tintColor)
     {
         var resolvedFontSize = (nfloat)Math.Max(fontSize > 0 ? fontSize : 16d, 8d);
         var font = ResolvePlatformFont(fontFamily, resolvedFontSize) ?? UIFont.SystemFontOfSize(resolvedFontSize);

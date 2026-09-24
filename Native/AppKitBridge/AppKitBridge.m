@@ -629,6 +629,32 @@ int appkit_get_window_chrome(double *titleBarHeight, double *leadingInset, int *
     return found;
 }
 
+// The CoreGraphics display ID of the screen the main window is on (the main screen when there is
+// no window). Returns 0 when there is no screen at all.
+__attribute__((visibility("default")))
+int appkit_get_window_display(uint32_t *displayId)
+{
+    __block uint32_t result = 0;
+    dispatch_block_t read = ^{
+        NSWindow *window = AKBMainWindow();
+        NSScreen *screen = window.screen ?: NSScreen.mainScreen;
+        NSNumber *number = screen.deviceDescription[@"NSScreenNumber"];
+        result = number != nil ? number.unsignedIntValue : 0;
+    };
+
+    if ([NSThread isMainThread])
+    {
+        read();
+    }
+    else
+    {
+        dispatch_sync(dispatch_get_main_queue(), read);
+    }
+
+    *displayId = result;
+    return result != 0;
+}
+
 // Reports full-screen transitions of the app's UIKit windows. kind: 0 will enter, 1 did enter,
 // 2 will exit, 3 did exit, 4 the window moved to another screen.
 typedef void (*AKBWindowEvent)(int kind);

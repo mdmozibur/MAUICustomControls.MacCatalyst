@@ -211,6 +211,13 @@ public sealed class ComboBox : ContentView
         {
             SelectedIndex = -1;
         }
+        else if (SelectedIndex >= 0)
+        {
+            // XAML sets SelectedIndex="1" before the items arrive (inline items become an
+            // ItemsSource element, applied after the attributes); UWP selects that item once it
+            // exists, so the selection follows the new items.
+            SyncSelectedItemFromIndex(SelectedIndex);
+        }
     }
 
     private void SyncSelectedIndexFromItem(object? item)
