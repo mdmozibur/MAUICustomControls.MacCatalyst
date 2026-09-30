@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Builds StoreKitBridge.xcframework (Mac Catalyst arm64 + x86_64): a dynamic framework exposing a
-# C API over StoreKit 2. The .NET side calls it through [DllImport("__Internal")] in
-# Platforms/MacCatalyst/StoreKitBridge.cs once the app references the xcframework as a
-# NativeReference. Run with: bash ./build_xcframework.sh
+# Builds StoreKitBridge.xcframework (Mac Catalyst arm64 + x86_64, iOS device arm64): a dynamic
+# framework exposing a C API over StoreKit 2. The .NET side calls it through
+# [DllImport("__Internal")] in Platforms/MacCatalyst/StoreKitBridge.cs once the app references the
+# xcframework as a NativeReference. Run with: bash ./build_xcframework.sh
 
 set -euo pipefail
 
@@ -56,5 +56,27 @@ lipo -create \
   -output "$UNIVERSAL_DIR/$FRAMEWORK_NAME"
 cp "$ROOT_DIR/Info.plist" "$UNIVERSAL_DIR/Info.plist"
 
-xcodebuild -create-xcframework -framework "$UNIVERSAL_DIR" -output "$OUTPUT_XCFRAMEWORK"
+# iPad (iOS device). The bundle is flat and declares iPhoneOS, or the device installer rejects it.
+IOS_SDK_PATH="$(xcrun --sdk iphoneos --show-sdk-path)"
+IOS_DIR="$BUILD_DIR/ios-arm64/$FRAMEWORK_NAME.framework"
+echo "Building $FRAMEWORK_NAME for arm64 (iOS)"
+mkdir -p "$IOS_DIR"
+xcrun --sdk iphoneos swiftc \
+  -target "arm64-apple-ios$MIN_CATALYST_VERSION" \
+  -sdk "$IOS_SDK_PATH" \
+  -swift-version 5 \
+  -O \
+  -parse-as-library \
+  -module-name "$FRAMEWORK_NAME" \
+  -emit-library \
+  -Xlinker -install_name -Xlinker "@rpath/$FRAMEWORK_NAME.framework/$FRAMEWORK_NAME" \
+  -framework StoreKit \
+  "$ROOT_DIR/StoreKitBridge.swift" \
+  -o "$IOS_DIR/$FRAMEWORK_NAME"
+cp "$ROOT_DIR/Info.plist" "$IOS_DIR/Info.plist"
+plutil -replace CFBundleSupportedPlatforms -json '["iPhoneOS"]' "$IOS_DIR/Info.plist"
+plutil -remove LSMinimumSystemVersion "$IOS_DIR/Info.plist"
+plutil -replace UIDeviceFamily -json '[1,2]' "$IOS_DIR/Info.plist"
+
+xcodebuild -create-xcframework -framework "$UNIVERSAL_DIR" -framework "$IOS_DIR" -output "$OUTPUT_XCFRAMEWORK"
 echo "Built $OUTPUT_XCFRAMEWORK"

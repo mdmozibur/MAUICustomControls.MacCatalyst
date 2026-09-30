@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0-maccatalyst</TargetFramework>
+    <TargetFrameworks>net10.0-maccatalyst;net10.0-ios</TargetFrameworks>
     <RootNamespace>Lottie.MacCatalyst.Binding</RootNamespace>
     <AssemblyName>Lottie.MacCatalyst.Binding</AssemblyName>
     <IsBindingProject>true</IsBindingProject>
