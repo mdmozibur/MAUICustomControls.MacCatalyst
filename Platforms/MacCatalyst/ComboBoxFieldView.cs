@@ -17,6 +17,7 @@ public sealed class ComboBoxFieldView : UIControl
     private const double ChevronWidth = 14;
     private const double ChevronSpacing = 8;
     private const double MinimumContentHeight = 15;
+    private const float DisabledAlpha = 0.4f;
 
     private readonly UIImageView _chevron;
     private UIView? _content;
@@ -36,6 +37,10 @@ public sealed class ComboBoxFieldView : UIControl
             TintColor = UIColor.SecondaryLabel
         };
         AddSubview(_chevron);
+
+        // One element for assistive technologies: a button whose value is the selection.
+        IsAccessibilityElement = true;
+        AccessibilityTraits = UIAccessibilityTrait.Button;
 
         // Catalyst runs with a pointer, so the field gets a hover state.
         AddGestureRecognizer(new UIHoverGestureRecognizer(OnHover));
@@ -91,6 +96,7 @@ public sealed class ComboBoxFieldView : UIControl
         if (content is not null)
             AddSubview(content);
 
+        UpdateEnabledAppearance();
         InvalidateIntrinsicContentSize();
         SetNeedsLayout();
     }
@@ -108,10 +114,37 @@ public sealed class ComboBoxFieldView : UIControl
         var height = Math.Max(contentSize.Height, MinimumContentHeight) + verticalInset;
         var width = contentSize.Width + horizontalInset + ChevronWidth + ChevronSpacing;
 
-        return new CGSize(size.Width > 0 ? size.Width : width, height);
+        // A finite offer is taken whole, so the field fills the cell it is given; with no bound
+        // (a horizontal stack, an Auto column) it is as wide as its content.
+        var bounded = size.Width > 0 && !double.IsInfinity(size.Width);
+        return new CGSize(bounded ? size.Width : width, height);
     }
 
     public override CGSize IntrinsicContentSize => SizeThatFits(new CGSize(NoIntrinsicMetric, NoIntrinsicMetric));
+
+    // UIControl does not dim itself. A hosted MAUI view already takes its control's disabled look,
+    // so only the field's own parts fade: the chevron and a native label.
+    public override bool Enabled
+    {
+        get => base.Enabled;
+        set
+        {
+            base.Enabled = value;
+            UpdateEnabledAppearance();
+        }
+    }
+
+    private void UpdateEnabledAppearance()
+    {
+        var alpha = Enabled ? 1f : DisabledAlpha;
+
+        // UIKit can set Enabled while the base constructor runs, before the chevron exists.
+        if (_chevron is not null)
+            _chevron.Alpha = alpha;
+
+        if (_content is not null and not MauiViewHost)
+            _content.Alpha = alpha;
+    }
 
     /// <summary>The element whose UseSystemFocusVisuals decides whether the focus ring is drawn.</summary>
     public Microsoft.Maui.Controls.BindableObject? FocusVisualsOwner { get; set; }

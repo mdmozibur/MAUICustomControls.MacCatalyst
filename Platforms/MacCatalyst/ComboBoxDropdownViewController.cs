@@ -23,8 +23,10 @@ internal sealed class ComboBoxDropdownViewController : UIViewController
     private readonly IReadOnlyList<object> _items;
     private readonly Func<object, UIView> _rowFactory;
     private readonly Action<int> _onSelect;
-    private readonly double _width;
+    private readonly Action _onCancel;
+    private readonly double _maxWidth;
     private readonly double _maxHeight;
+    private double _width;
     private readonly List<ComboBoxRowView> _rows = [];
 
     private UIScrollView _scrollView = null!;
@@ -36,13 +38,17 @@ internal sealed class ComboBoxDropdownViewController : UIViewController
         Func<object, UIView> rowFactory,
         int selectedIndex,
         double width,
+        double maxWidth,
         double maxHeight,
-        Action<int> onSelect)
+        Action<int> onSelect,
+        Action onCancel)
     {
         _items = items;
         _rowFactory = rowFactory;
         _onSelect = onSelect;
+        _onCancel = onCancel;
         _width = width;
+        _maxWidth = Math.Max(width, maxWidth);
         _maxHeight = maxHeight;
         _highlightedIndex = selectedIndex;
         SelectedIndex = selectedIndex;
@@ -77,6 +83,15 @@ internal sealed class ComboBoxDropdownViewController : UIViewController
 
             if (i < _items.Count - 1)
                 _stack.AddArrangedSubview(CreateSeparator());
+        }
+
+        // The list is as wide as its field, and grows - up to the cap - until its widest row fits,
+        // as a WinUI drop-down does. A narrow field would otherwise cut its own entries short.
+        if (_rows.Count > 0)
+        {
+            _width = Math.Min(_maxWidth, Math.Max(_width, _rows.Max(static row => row.NaturalWidth)));
+            foreach (var row in _rows)
+                row.PreferredWidth = _width;
         }
 
         _scrollView = new UIScrollView
@@ -148,7 +163,7 @@ internal sealed class ComboBoxDropdownViewController : UIViewController
     }
 
     [Export("dismissDropdown:")]
-    public void DismissDropdown(UIKeyCommand command) => DismissViewController(true, null);
+    public void DismissDropdown(UIKeyCommand command) => _onCancel();
 
     private CGSize CalculateContentSize()
     {

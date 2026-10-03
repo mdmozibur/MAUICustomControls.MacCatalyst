@@ -41,6 +41,9 @@ internal sealed class MauiViewHost : UIView
         return new CGSize(measured.Width, measured.Height);
     }
 
+    /// <summary>The view's width when nothing constrains it: a text row on a single line.</summary>
+    public double NaturalWidth => _view.Measure(double.PositiveInfinity, double.PositiveInfinity).Width;
+
     public override CGSize IntrinsicContentSize =>
         SizeThatFits(new CGSize(LayoutWidth <= 0 ? NoIntrinsicMetric : LayoutWidth, NoIntrinsicMetric));
 

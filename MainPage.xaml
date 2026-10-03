@@ -42,11 +42,11 @@
         
             <controls:ComboBox 
                 x:Name="comboBox"
-                UnselectedText="Select an option"
+                Placeholder="Select an option"
                 HorizontalOptions="Center" 
                 BorderThickness="1"
                 WidthRequest="200">
-                <controls:ComboBox.Options>
+                <controls:ComboBox.ItemsSource>
                     <x:Array Type="{x:Type customObjects:SelectorOption}">
                         <customObjects:SelectorOption Text="Option 1" SystemIconName="star"/>
                         <customObjects:SelectorOption Text="Option 2" SystemIconName="heart"/>
@@ -54,7 +54,7 @@
                         <customObjects:SelectorOption Text="Option 4" SystemIconName="flame"/>
                         <customObjects:SelectorOption Text="Option 5" SystemIconName="cloud"/>
                     </x:Array>
-                </controls:ComboBox.Options>
+                </controls:ComboBox.ItemsSource>
             </controls:ComboBox>
         
             <controls:ToggleDropdown 

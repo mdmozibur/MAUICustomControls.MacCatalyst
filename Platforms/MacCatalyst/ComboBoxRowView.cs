@@ -13,7 +13,7 @@ internal sealed class ComboBoxRowView : UIControl
     private readonly bool _isSelected;
     private readonly Action _onActivated;
     private readonly Action _onHovered;
-    private readonly double _width;
+    private double _width;
 
     private bool _isHighlighted;
 
@@ -40,6 +40,29 @@ internal sealed class ComboBoxRowView : UIControl
         {
             _isHighlighted = value;
             UpdateBackground();
+        }
+    }
+
+    /// <summary>Width the row reports when Auto Layout asks without offering one.</summary>
+    public double PreferredWidth
+    {
+        get => _width;
+        set
+        {
+            _width = value;
+            InvalidateIntrinsicContentSize();
+        }
+    }
+
+    /// <summary>Width the row needs to show its content without wrapping or truncating it.</summary>
+    public double NaturalWidth
+    {
+        get
+        {
+            var content = _content is MauiViewHost host
+                ? host.NaturalWidth
+                : (double)_content.SizeThatFits(new CGSize(nfloat.MaxValue, nfloat.MaxValue)).Width;
+            return Math.Ceiling(content) + (HorizontalPadding * 2);
         }
     }
 
