@@ -278,7 +278,7 @@ public class LazyLayoutHandler : ViewHandler<ILayout, LayoutView>, ILayoutHandle
         view?.Handler is IPlatformViewHandler handler ? handler.ContainerView ?? handler.PlatformView : null;
 
     // MAUI's own InvalidateAncestorsMeasures is internal; this is the same walk.
-    private static void InvalidateAncestorsMeasures(UIView child)
+    internal static void InvalidateAncestorsMeasures(UIView child)
     {
         var controller = child as IPlatformMeasureInvalidationController;
         while (true)
