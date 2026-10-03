@@ -10,6 +10,15 @@ public sealed class CheckBox : ContentView
     public event EventHandler? Checked;
     public event EventHandler? Unchecked;
 
+    /// <summary>
+    /// UWP's Click: the user toggled the box (a click, Space, or VoiceOver's activate). Unlike
+    /// <see cref="CheckedChanged"/> it is not raised when code sets <see cref="IsChecked"/>; it
+    /// follows the state change, so a handler reads the new state.
+    /// </summary>
+    public event EventHandler? Clicked;
+
+    internal void RaiseClicked() => Clicked?.Invoke(this, EventArgs.Empty);
+
     public string? Name
     {
         get => AutomationId;

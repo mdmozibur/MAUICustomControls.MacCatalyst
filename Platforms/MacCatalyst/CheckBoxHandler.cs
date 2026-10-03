@@ -93,6 +93,7 @@ public sealed class CheckBoxHandler : ViewHandler<CheckBox, UIButton>
     private void ButtonTapped(object? sender, EventArgs e)
     {
         VirtualView.IsChecked = !VirtualView.IsChecked;
+        VirtualView.RaiseClicked();
     }
 
     protected override UIButton CreatePlatformView()
