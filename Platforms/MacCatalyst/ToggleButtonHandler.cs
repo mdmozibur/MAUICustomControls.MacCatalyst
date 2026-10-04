@@ -169,6 +169,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         }
 
         UpdateButtonAppearance(PlatformView, VirtualView);
+        VirtualView.RaiseClicked();
     }
 
     public static void MapIsSelected(ToggleButtonHandler handler, ToggleButton view)

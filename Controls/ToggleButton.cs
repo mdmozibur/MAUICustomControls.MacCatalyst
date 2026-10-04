@@ -7,6 +7,16 @@ public class ToggleButton : ContentView
     public event EventHandler? Unchecked;
     public event EventHandler<CheckedChangedEventArgs>? CheckedChanged;
 
+    /// <summary>
+    /// UWP's Click: the user pressed the button (a click, Space, or VoiceOver's activate). Unlike
+    /// <see cref="Checked"/>, <see cref="Unchecked"/> and <see cref="Toggled"/> it is not raised
+    /// when code sets <see cref="IsChecked"/>; it follows the state change, so a handler reads the
+    /// new state.
+    /// </summary>
+    public event EventHandler? Clicked;
+
+    internal void RaiseClicked() => Clicked?.Invoke(this, EventArgs.Empty);
+
     public static readonly BindableProperty IsCheckedProperty =
         BindableProperty.Create(nameof(IsChecked), typeof(bool), typeof(ToggleButton), false, BindingMode.TwoWay, propertyChanged: OnIsCheckedChanged);
 
