@@ -70,7 +70,12 @@ internal static class BorderedLayoutChrome
             layer.AddSublayer(borderLayer);
         }
 
-        var bounds = platformView.Bounds;
+        // The element's size, not the native bounds: MAUI raises SizeChanged before it moves the
+        // native frame, so on the first layout the bounds are still empty (and the border stayed
+        // unpainted until something resized the panel).
+        var bounds = element.Width > 0 && element.Height > 0
+            ? new CGRect(0, 0, element.Width, element.Height)
+            : platformView.Bounds;
         var inner = new CGRect(
             bounds.X + borderThickness.Left,
             bounds.Y + borderThickness.Top,
