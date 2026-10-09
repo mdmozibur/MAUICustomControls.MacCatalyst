@@ -289,7 +289,9 @@ public sealed class AnchoredOverlay
             return;
         }
 
-        var area = PopoverLayout.UsableArea(_container);
+        // A XAML Popup (placed by its offsets, drawing itself) may cover the whole window, as a
+        // full-window backdrop does; bubbles keep clear of the window's edges and title bar.
+        var area = _offset is not null && !_options.ShowChrome ? _container.Bounds : PopoverLayout.UsableArea(_container);
         var padding = _chromeOptions.Padding;
         var arrow = _chromeOptions.ShowArrow ? PopoverChromeView.ArrowLength : 0;
 
