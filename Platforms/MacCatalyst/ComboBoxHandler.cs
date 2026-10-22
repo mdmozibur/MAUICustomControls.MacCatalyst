@@ -72,7 +72,8 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, ComboBoxView>
     {
         platformView.Field.TouchUpInside -= OnFieldTapped;
         VirtualView.ItemsChanged -= OnItemsChanged;
-        CloseDropdown(animated: false);
+        // MAUI has already cleared PlatformView by now (reading it throws), so the view is passed on.
+        CloseDropdown(animated: false, platformView: platformView);
         _fieldState = null;
 
         base.DisconnectHandler(platformView);
@@ -361,9 +362,9 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, ComboBoxView>
         view.IsDropDownOpen = false;
     }
 
-    private void CloseDropdown(bool animated, bool notify = true)
+    private void CloseDropdown(bool animated, bool notify = true, ComboBoxView? platformView = null)
     {
-        PlatformView.Field.IsOpen = false;
+        (platformView ?? PlatformView).Field.IsOpen = false;
 
         if (_dropdown is null)
             return;

@@ -539,7 +539,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
 
     // Glyphs are rendered once as template images: the button and menu tint them with the current
     // (dynamic) foreground, so checked/unchecked and light/dark need no re-rendering.
-    private static UIImage? CreateFontGlyphImage(string glyph, string fontFamily, double fontSize, FontAttributes fontAttributes)
+    internal static UIImage? CreateFontGlyphImage(string glyph, string fontFamily, double fontSize, FontAttributes fontAttributes)
     {
         var key = (glyph, fontFamily, fontSize, fontAttributes);
         if (!GlyphImages.TryGetValue(key, out var image))

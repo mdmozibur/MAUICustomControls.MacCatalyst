@@ -8,7 +8,8 @@ using UIKit;
 namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst;
 
 /// <summary>One entry of a <see cref="DropdownOptionsMenu"/>.</summary>
-internal readonly record struct DropdownMenuItem(string Title, UIImage? Image, bool IsSelected);
+/// <remarks>A disabled entry is drawn dimmed and cannot be chosen (a MenuFlyout item with IsEnabled false).</remarks>
+internal readonly record struct DropdownMenuItem(string Title, UIImage? Image, bool IsSelected, bool IsEnabled = true);
 
 /// <summary>
 /// The option list of a ToggleDropdown, shown in the app's popover. UIButton's own menu becomes an
@@ -23,11 +24,13 @@ internal sealed class DropdownOptionsMenu
     private readonly PopoverHostViewController _controller;
     private readonly PopoverTransitioningDelegate _transitioning;
     private readonly Action<int> _chosen;
+    private readonly IReadOnlyList<DropdownMenuItem> _items;
     private bool _dismissed;
 
     private DropdownOptionsMenu(UIView source, IReadOnlyList<DropdownMenuItem> items, UIColor accent, Action<int> chosen)
     {
         _chosen = chosen;
+        _items = items;
         var list = new OptionListView(items, accent, Choose);
         _controller = new PopoverHostViewController(list, () => Dismiss(null));
         _controller.PreferredContentSize = new CGSize(
@@ -62,7 +65,13 @@ internal sealed class DropdownOptionsMenu
     /// <summary>Closes the open menu, if any (its dropdown went away).</summary>
     public static void DismissOpen() => _open?.Dismiss(null);
 
-    private void Choose(int index) => Dismiss(index);
+    private void Choose(int index)
+    {
+        if (_items[index].IsEnabled)
+        {
+            Dismiss(index);
+        }
+    }
 
     private void Dismiss(int? chosenIndex)
     {
@@ -176,6 +185,7 @@ internal sealed class DropdownOptionsMenu
             private readonly UIView _highlight;
             private readonly UIColor _accent;
             private readonly bool _reserveIcon;
+            private readonly bool _isEnabled;
 
             public OptionRow(DropdownMenuItem item, UIFont font, UIColor accent, bool reserveIcon, Action chosen, Action<bool> hovered)
             {
@@ -207,13 +217,22 @@ internal sealed class DropdownOptionsMenu
                 var titleWidth = new NSString(item.Title).GetSizeUsingAttributes(new UIStringAttributes { Font = font }).Width;
                 PreferredWidth = CheckColumn + (reserveIcon ? IconSize + IconGap : 0) + (double)titleWidth + TrailingPadding;
 
+                _isEnabled = item.IsEnabled;
+                Enabled = item.IsEnabled;
+                if (!item.IsEnabled)
+                {
+                    _title.TextColor = UIColor.TertiaryLabel;
+                    _icon.TintColor = UIColor.TertiaryLabel;
+                }
+
                 AddTarget((_, _) => chosen(), UIControlEvent.TouchUpInside);
                 AddGestureRecognizer(new UIHoverGestureRecognizer(recognizer =>
                     hovered(recognizer.State is UIGestureRecognizerState.Began or UIGestureRecognizerState.Changed)));
 
                 IsAccessibilityElement = true;
                 AccessibilityLabel = item.Title;
-                AccessibilityTraits = item.IsSelected ? UIAccessibilityTrait.Button | UIAccessibilityTrait.Selected : UIAccessibilityTrait.Button;
+                AccessibilityTraits = (item.IsSelected ? UIAccessibilityTrait.Button | UIAccessibilityTrait.Selected : UIAccessibilityTrait.Button)
+                    | (item.IsEnabled ? UIAccessibilityTrait.None : UIAccessibilityTrait.NotEnabled);
             }
 
             public double PreferredWidth { get; }
@@ -236,7 +255,13 @@ internal sealed class DropdownOptionsMenu
 
             public void SetHighlighted(bool highlighted)
             {
-                // macOS menus: accent background with white content under the pointer.
+                // macOS menus: accent background with white content under the pointer; a disabled
+                // entry is not highlighted.
+                if (!_isEnabled)
+                {
+                    return;
+                }
+
                 var foreground = highlighted ? UIColor.White : UIColor.Label;
                 _highlight.BackgroundColor = highlighted ? _accent : UIColor.Clear;
                 _title.TextColor = foreground;

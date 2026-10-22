@@ -249,6 +249,7 @@ public static class ContextMenuSupport
             }
 
             _openFlyout = flyout;
+            ContextMenuFlyout.OpenContextMenu = flyout;
             var menu = UIMenu.Create(string.Empty, null, UIMenuIdentifier.None, 0, elements);
             return UIContextMenuConfiguration.Create(null, null, _ => menu);
         }
@@ -256,6 +257,11 @@ public static class ContextMenuSupport
         public override void WillEnd(UIContextMenuInteraction interaction, UIContextMenuConfiguration configuration, IUIContextMenuInteractionAnimating? animator)
         {
             var flyout = _openFlyout as ContextMenuFlyout;
+            if (ReferenceEquals(ContextMenuFlyout.OpenContextMenu, _openFlyout))
+            {
+                ContextMenuFlyout.OpenContextMenu = null;
+            }
+
             _openFlyout = null;
             if (flyout is null)
             {

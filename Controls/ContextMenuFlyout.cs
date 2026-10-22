@@ -13,6 +13,12 @@ public class ContextMenuFlyout : MenuFlyout
     internal void RaiseOpening() => Opening?.Invoke(this, EventArgs.Empty);
 
     internal void RaiseClosed() => Closed?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// The context menu on screen, or null (the menu UWP's VisualTreeHelper.GetOpenPopups lists
+    /// as a MenuFlyoutPresenter).
+    /// </summary>
+    public static IMenuFlyout? OpenContextMenu { get; internal set; }
 }
 
 /// <summary>A menu element that can be left out of its menu, which MAUI's menu elements cannot.</summary>

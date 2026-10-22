@@ -147,6 +147,20 @@ public sealed class PopoverButton : ContentView
 		set => SetValue(ShowPopoverArrowProperty, value);
 	}
 
+	public static readonly BindableProperty OpensOnClickProperty =
+		BindableProperty.Create(nameof(OpensOnClick), typeof(bool), typeof(PopoverButton), true);
+
+	/// <summary>
+	/// Whether a click opens the popover (UWP Button.Flyout). False for a flyout the code shows
+	/// itself (UWP FlyoutBase.AttachedFlyout + ShowAttachedFlyout): a click only raises Clicked,
+	/// and <see cref="ShowPopover"/> opens it.
+	/// </summary>
+	public bool OpensOnClick
+	{
+		get => (bool)GetValue(OpensOnClickProperty);
+		set => SetValue(OpensOnClickProperty, value);
+	}
+
 	public static readonly BindableProperty PopoverPaddingProperty =
 		BindableProperty.Create(nameof(PopoverPadding), typeof(Thickness), typeof(PopoverButton), new Thickness(8));
 
@@ -174,6 +188,14 @@ public sealed class PopoverButton : ContentView
 
 	internal Action? HidePopoverAction { get; set; }
 
+	internal Action? ShowPopoverAction { get; set; }
+
+	/// <summary>Opens the popover anchored to the button (UWP FlyoutBase.ShowAttachedFlyout).</summary>
+	public void ShowPopover()
+	{
+		ShowPopoverAction?.Invoke();
+	}
+
 	public void Hide()
 	{
 		HidePopover();
@@ -199,13 +221,43 @@ public sealed class PopoverButton : ContentView
 		Opening?.Invoke(this, EventArgs.Empty);
 	}
 
+	private static readonly List<WeakReference<PopoverButton>> OpenButtons = new();
+
+	/// <summary>
+	/// The buttons whose popover is on screen, oldest first (the flyouts UWP's
+	/// VisualTreeHelper.GetOpenPopups lists).
+	/// </summary>
+	public static IReadOnlyList<PopoverButton> OpenPopovers
+	{
+		get
+		{
+			var open = new List<PopoverButton>();
+			OpenButtons.RemoveAll(reference => !reference.TryGetTarget(out _));
+			foreach (var reference in OpenButtons)
+			{
+				if (reference.TryGetTarget(out var button))
+					open.Add(button);
+			}
+
+			return open;
+		}
+	}
+
+	/// <summary>Whether the popover is on screen.</summary>
+	public bool IsPopoverOpen { get; private set; }
+
 	internal void RaiseOpened()
 	{
+		IsPopoverOpen = true;
+		OpenButtons.RemoveAll(reference => !reference.TryGetTarget(out var button) || ReferenceEquals(button, this));
+		OpenButtons.Add(new WeakReference<PopoverButton>(this));
 		Opened?.Invoke(this, EventArgs.Empty);
 	}
 
 	internal void RaiseClosed()
 	{
+		IsPopoverOpen = false;
+		OpenButtons.RemoveAll(reference => !reference.TryGetTarget(out var button) || ReferenceEquals(button, this));
 		Closed?.Invoke(this, EventArgs.Empty);
 	}
 

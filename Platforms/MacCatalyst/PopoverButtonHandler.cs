@@ -49,6 +49,7 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
             if (VirtualView is PopoverButton popoverButton)
             {
                 popoverButton.HidePopoverAction = () => HideActivePopover(animated: true);
+                popoverButton.ShowPopoverAction = () => PresentPopover(popoverButton);
                 // Listened to rather than mapped: mapping IsEnabled here would replace MAUI's own mapping.
                 popoverButton.PropertyChanged += PopoverButton_PropertyChanged;
                 MapAccessibility(this, popoverButton);
@@ -68,6 +69,7 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
             if (VirtualView is PopoverButton popoverButton)
             {
                 popoverButton.HidePopoverAction = null;
+                popoverButton.ShowPopoverAction = null;
                 popoverButton.PropertyChanged -= PopoverButton_PropertyChanged;
             }
 
@@ -125,15 +127,22 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
 
             popoverButton.RaiseClicked();
 
-            var presentedContent = popoverButton.GetPresentedContent();
-            if (presentedContent == null)
-                return;
-
             if (IsPopoverPresented)
             {
                 HideActivePopover(animated: true);
                 return;
             }
+
+            // A flyout the code opens (ShowPopover) is not opened by the click itself.
+            if (popoverButton.OpensOnClick)
+                PresentPopover(popoverButton);
+        }
+
+        private void PresentPopover(PopoverButton popoverButton)
+        {
+            var presentedContent = popoverButton.GetPresentedContent();
+            if (presentedContent == null || IsPopoverPresented)
+                return;
 
             var presentingController = GetPresentingViewController();
             if (presentingController is null)
