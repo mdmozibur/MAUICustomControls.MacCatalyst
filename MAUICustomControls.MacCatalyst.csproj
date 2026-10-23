@@ -69,6 +69,8 @@
 
 	<ItemGroup>
 		<Compile Remove="Lottie.MacCatalyst.Binding/**/*.cs" />
+		<!-- Linux handlers (Avalonia): compiled into converted Linux apps, not into this Mac library. -->
+		<Compile Remove="Platforms/Linux/**/*.cs" />
 	</ItemGroup>
 
   <!-- StoreKit 2 bridge (Swift, C API) called by Platforms/MacCatalyst/StoreKitBridge.cs.
