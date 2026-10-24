@@ -26,6 +26,53 @@ public static class LinuxHandlers
         JustifyLabels();
         ListNotifyingItemsSources();
         LetUnpaintedLayoutsPassInput();
+        ShowContextMenusThroughPresenter();
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Avalonia.Controls.Control, Microsoft.Maui.Controls.VisualElement> ContextMenuOwners = new();
+
+    /// <summary>
+    /// The backend turns FlyoutBase.ContextFlyout into an Avalonia ContextMenu built once, so UWP's
+    /// Opening never ran and hidden items stayed in it (the canvas menu showed every command).
+    /// A context request opens the MAUI menu through <see cref="MenuPresenter"/> instead, at the
+    /// pointer, as the Mac's ContextMenuSupport does.
+    /// </summary>
+    private static void ShowContextMenusThroughPresenter()
+    {
+        Avalonia.Controls.Maui.Handlers.ViewHandler.ViewMapper.ModifyMapping<IView, IViewHandler>(
+            nameof(IContextFlyoutElement.ContextFlyout),
+            (handler, view, _) =>
+            {
+                if (handler.PlatformView is not Avalonia.Controls.Control control)
+                {
+                    return;
+                }
+
+                control.ContextMenu = null;
+                control.RemoveHandler(Avalonia.Controls.Control.ContextRequestedEvent, OnContextRequested);
+                ContextMenuOwners.Remove(control);
+                if (view is Microsoft.Maui.Controls.VisualElement element and IContextFlyoutElement { ContextFlyout: Microsoft.Maui.Controls.MenuFlyout })
+                {
+                    ContextMenuOwners.Add(control, element);
+                    control.AddHandler(Avalonia.Controls.Control.ContextRequestedEvent, OnContextRequested);
+                }
+            });
+    }
+
+    private static void OnContextRequested(object? sender, Avalonia.Input.ContextRequestedEventArgs e)
+    {
+        if (e.Handled || sender is not Avalonia.Controls.Control control ||
+            !ContextMenuOwners.TryGetValue(control, out var element) ||
+            element is not IContextFlyoutElement { ContextFlyout: Microsoft.Maui.Controls.MenuFlyout menu })
+        {
+            return;
+        }
+
+        e.Handled = true;
+        Microsoft.Maui.Graphics.Point? position = e.TryGetPosition(control, out var point)
+            ? new Microsoft.Maui.Graphics.Point(point.X, point.Y)
+            : null;
+        MenuPresenter.ShowAt(menu, element, position);
     }
 
     /// <summary>
