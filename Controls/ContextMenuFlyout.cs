@@ -89,6 +89,28 @@ public class AppMenuItem : MenuFlyoutItem, IHideableMenuElement
     }
 }
 
+/// <summary>
+/// UWP's ToggleMenuFlyoutItem: an <see cref="AppMenuItem"/> with a check mark that a click flips
+/// before the item's Clicked handlers run, as UWP flips IsChecked before Click.
+/// </summary>
+public class AppToggleMenuItem : AppMenuItem
+{
+    public static readonly BindableProperty IsCheckedProperty = BindableProperty.Create(
+        nameof(IsChecked), typeof(bool), typeof(AppToggleMenuItem), false);
+
+    public AppToggleMenuItem()
+    {
+        // Subscribed first, so it runs before every handler the app adds.
+        Clicked += (_, _) => IsChecked = !IsChecked;
+    }
+
+    public bool IsChecked
+    {
+        get => (bool)GetValue(IsCheckedProperty);
+        set => SetValue(IsCheckedProperty, value);
+    }
+}
+
 /// <summary>MenuFlyoutSubItem with <see cref="IsVisible"/>.</summary>
 public class AppMenuSubItem : MenuFlyoutSubItem, IHideableMenuElement
 {
