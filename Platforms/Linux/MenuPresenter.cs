@@ -33,7 +33,7 @@ public static class MenuPresenter
         contextMenu?.RaiseOpening();
 
         var flyout = new MenuFlyout();
-        foreach (var item in BuildItems(menu))
+        foreach (var item in BuildItems(menu, target.Handler.MauiContext))
         {
             flyout.Items.Add(item);
         }
@@ -70,7 +70,7 @@ public static class MenuPresenter
         flyout.ShowAt(anchor);
     }
 
-    private static List<Control> BuildItems(IEnumerable<Microsoft.Maui.IMenuElement> elements)
+    private static List<Control> BuildItems(IEnumerable<Microsoft.Maui.IMenuElement> elements, Microsoft.Maui.IMauiContext? context)
     {
         var items = new List<Control>();
         var pendingSeparator = false;
@@ -89,8 +89,8 @@ public static class MenuPresenter
 
             var item = element switch
             {
-                MauiMenuFlyoutSubItem subItem => CreateSubmenu(subItem),
-                MauiMenuFlyoutItem menuItem => CreateItem(menuItem),
+                MauiMenuFlyoutSubItem subItem => CreateSubmenu(subItem, context),
+                MauiMenuFlyoutItem menuItem => CreateItem(menuItem, context),
                 _ => null,
             };
             if (item is null)
@@ -110,15 +110,15 @@ public static class MenuPresenter
         return items;
     }
 
-    private static MenuItem? CreateSubmenu(MauiMenuFlyoutSubItem subItem)
+    private static MenuItem? CreateSubmenu(MauiMenuFlyoutSubItem subItem, Microsoft.Maui.IMauiContext? context)
     {
-        var children = BuildItems(subItem);
+        var children = BuildItems(subItem, context);
         if (children.Count == 0)
         {
             return null;
         }
 
-        var item = new MenuItem { Header = subItem.Text, IsEnabled = subItem.IsEnabled };
+        var item = new MenuItem { Header = subItem.Text, IsEnabled = subItem.IsEnabled, Icon = CreateIcon(subItem.IconImageSource, context) };
         foreach (var child in children)
         {
             item.Items.Add(child);
@@ -127,9 +127,9 @@ public static class MenuPresenter
         return item;
     }
 
-    private static MenuItem CreateItem(MauiMenuFlyoutItem source)
+    private static MenuItem CreateItem(MauiMenuFlyoutItem source, Microsoft.Maui.IMauiContext? context)
     {
-        var item = new MenuItem { Header = source.Text, IsEnabled = source.IsEnabled };
+        var item = new MenuItem { Header = source.Text, IsEnabled = source.IsEnabled, Icon = CreateIcon(source.IconImageSource, context) };
         if (source is AppToggleMenuItem toggle)
         {
             item.ToggleType = MenuItemToggleType.CheckBox;
@@ -139,5 +139,74 @@ public static class MenuPresenter
         // Activate raises Clicked and runs the Command, as choosing the item does on the other platforms.
         item.Click += (_, _) => ((Microsoft.Maui.Controls.IMenuItemController)source).Activate();
         return item;
+    }
+
+    private const double IconSize = 16;
+
+    /// <summary>
+    /// The item's icon: a font glyph as text in the resolved font, any other image source rendered
+    /// by the backend's image service (it arrives once loaded). The check mark of a toggle item takes
+    /// the icon's place, as in Avalonia's menus.
+    /// </summary>
+    private static Control? CreateIcon(Microsoft.Maui.Controls.ImageSource? source, Microsoft.Maui.IMauiContext? context)
+    {
+        switch (source)
+        {
+            case null:
+                return null;
+            case Microsoft.Maui.Controls.FontImageSource { Glyph: { Length: > 0 } glyph } font:
+                var text = new TextBlock
+                {
+                    Text = glyph,
+                    FontSize = IconSize,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                };
+                if (LinuxControlSupport.ResolveFontFamily(context, font.FontFamily, IconSize) is { } family)
+                {
+                    text.FontFamily = family;
+                }
+
+                if (font.Color is { } color)
+                {
+                    text.Foreground = new Avalonia.Media.SolidColorBrush(color.ToAvalonia());
+                }
+
+                return text;
+        }
+
+        var provider = context?.Services.GetService(typeof(Microsoft.Maui.IImageSourceServiceProvider)) as Microsoft.Maui.IImageSourceServiceProvider;
+        // A subclass (the app's SymbolImageSource is a StreamImageSource) can resolve to MAUI's own
+        // service; the base type is registered with the backend's.
+        var service = provider?.GetImageSourceService(source.GetType()) as Avalonia.Controls.Maui.Services.IAvaloniaImageSourceService
+            ?? source switch
+            {
+                Microsoft.Maui.Controls.StreamImageSource => provider?.GetImageSourceService(typeof(Microsoft.Maui.Controls.StreamImageSource)),
+                Microsoft.Maui.Controls.FileImageSource => provider?.GetImageSourceService(typeof(Microsoft.Maui.Controls.FileImageSource)),
+                _ => null,
+            } as Avalonia.Controls.Maui.Services.IAvaloniaImageSourceService;
+        if (service is null)
+        {
+            return null;
+        }
+
+        var image = new Image { Width = IconSize, Height = IconSize };
+        _ = LoadAsync();
+        return image;
+
+        async Task LoadAsync()
+        {
+            try
+            {
+                if (await service.GetImageAsync(source) is { Value: { } bitmap })
+                {
+                    image.Source = bitmap;
+                }
+            }
+            catch (Exception)
+            {
+                // No icon: the item still shows its text.
+            }
+        }
     }
 }
