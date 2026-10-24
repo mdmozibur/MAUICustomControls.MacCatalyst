@@ -70,7 +70,7 @@ public static class MenuPresenter
         flyout.ShowAt(anchor);
     }
 
-    private static List<Control> BuildItems(IEnumerable<Microsoft.Maui.IMenuElement> elements, Microsoft.Maui.IMauiContext? context)
+    internal static List<Control> BuildItems(IEnumerable<Microsoft.Maui.IMenuElement> elements, Microsoft.Maui.IMauiContext? context)
     {
         var items = new List<Control>();
         var pendingSeparator = false;
@@ -134,6 +134,22 @@ public static class MenuPresenter
         {
             item.ToggleType = MenuItemToggleType.CheckBox;
             item.IsChecked = toggle.IsChecked;
+        }
+
+        // The shortcut's text only; the key itself is matched by the app's accelerator handling.
+        if (source.KeyboardAccelerators.FirstOrDefault() is { } accelerator &&
+            Enum.TryParse<Avalonia.Input.Key>(accelerator.Key, ignoreCase: true, out var key))
+        {
+            var modifiers = Avalonia.Input.KeyModifiers.None;
+            // Converted menus carry Cmd for UWP's Ctrl (the Mac's menu bar); on Linux it is Ctrl.
+            if (accelerator.Modifiers.HasFlag(Microsoft.Maui.KeyboardAcceleratorModifiers.Cmd) ||
+                accelerator.Modifiers.HasFlag(Microsoft.Maui.KeyboardAcceleratorModifiers.Ctrl))
+                modifiers |= Avalonia.Input.KeyModifiers.Control;
+            if (accelerator.Modifiers.HasFlag(Microsoft.Maui.KeyboardAcceleratorModifiers.Shift))
+                modifiers |= Avalonia.Input.KeyModifiers.Shift;
+            if (accelerator.Modifiers.HasFlag(Microsoft.Maui.KeyboardAcceleratorModifiers.Alt))
+                modifiers |= Avalonia.Input.KeyModifiers.Alt;
+            item.InputGesture = new Avalonia.Input.KeyGesture(key, modifiers);
         }
 
         // Activate raises Clicked and runs the Command, as choosing the item does on the other platforms.

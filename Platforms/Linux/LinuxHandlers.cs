@@ -21,6 +21,7 @@ public static class LinuxHandlers
         handlers.AddHandler(typeof(Controls.SegmentedButtons), typeof(SegmentedButtonsHandler));
         handlers.AddHandler(typeof(Controls.ProgressRing), typeof(ProgressRingHandler));
         handlers.AddHandler(typeof(Controls.AnimatedVisualPlayer), typeof(AnimatedVisualPlayerHandler));
+        handlers.AddHandler(typeof(Controls.AppMenuBarHost), typeof(AppMenuBarHostHandler));
 
         TreatColorlessBrushesAsEmpty();
         JustifyLabels();
