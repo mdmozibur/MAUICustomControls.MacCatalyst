@@ -35,6 +35,7 @@ public sealed class ToggleDropdownHandler : Avalonia.Controls.Maui.Handlers.View
         [nameof(ToggleDropdown.SelectedOption)] = MapAll,
         [nameof(ToggleDropdown.ChangeUnselectedTextOnSelectionChange)] = MapAll,
         [nameof(ToggleDropdown.IsActionMenu)] = MapAll,
+        [nameof(ToggleDropdown.IsMenuButton)] = MapAll,
         [nameof(ToggleDropdown.IconGlyph)] = MapAll,
         [nameof(ToggleDropdown.IconFontFamily)] = MapAll,
         [nameof(ToggleDropdown.Padding)] = MapAll,
@@ -106,14 +107,14 @@ public sealed class ToggleDropdownHandler : Avalonia.Controls.Maui.Handlers.View
             return;
         }
 
-        if (!dropdown.IsActionMenu && !dropdown.IsChecked)
+        if (!dropdown.OpensOnClick && !dropdown.IsChecked)
         {
             dropdown.MarkNextToggleAsUserInitiated();
             dropdown.IsChecked = true;
             return;
         }
 
-        if (dropdown.Options is { Count: > 0 } options && (dropdown.IsActionMenu || options.Count > 1))
+        if (dropdown.Options is { Count: > 0 } options && (dropdown.OpensOnClick || options.Count > 1))
         {
             ShowOptions(dropdown, options);
         }
@@ -164,7 +165,7 @@ public sealed class ToggleDropdownHandler : Avalonia.Controls.Maui.Handlers.View
 
         var selectedOption = dropdown.Options[index];
         dropdown.MarkNextSelectionAsUserInitiated();
-        if (!dropdown.IsActionMenu)
+        if (!dropdown.OpensOnClick)
         {
             dropdown.MarkNextToggleAsUserInitiated();
             dropdown.IsChecked = true;
@@ -186,7 +187,7 @@ public sealed class ToggleDropdownHandler : Avalonia.Controls.Maui.Handlers.View
         }
 
         // UWP template: the theme's foreground normally, the accent only when checked.
-        var foreground = dropdown.IsChecked
+        var foreground = dropdown.ShowsCheckedState
             ? new SolidColorBrush(dropdown.TintColor.ToAvalonia())
             : dropdown.TextColor is { } textColor ? new SolidColorBrush(textColor.ToAvalonia()) : null;
 
@@ -211,8 +212,8 @@ public sealed class ToggleDropdownHandler : Avalonia.Controls.Maui.Handlers.View
         var root = new Grid();
         root.Children.Add(content);
 
-        var hasMenu = dropdown.Options is { Count: > 1 } && !dropdown.IsActionMenu;
-        if (hasMenu && dropdown.IsChecked)
+        var hasMenu = dropdown.Options is { Count: > 1 };
+        if (hasMenu && dropdown.ShowsCheckedState)
         {
             var indicator = new TextBlock
             {

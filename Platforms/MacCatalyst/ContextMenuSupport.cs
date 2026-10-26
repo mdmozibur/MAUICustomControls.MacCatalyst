@@ -83,6 +83,93 @@ public static class ContextMenuSupport
         }
     }
 
+    /// <summary>
+    /// Opens <paramref name="flyout"/> from code at <paramref name="location"/> (in the view's own
+    /// coordinates) as the same native menu a secondary click shows: <see cref="ContextMenuFlyout.Opening"/>
+    /// first, then sections, sub-menus, check marks and disabled items, and Closed after the chosen
+    /// item. UWP's MenuFlyout.ShowAt, and a Button.Flyout menu. Returns false when it cannot be shown
+    /// that way (no handler, or Mac Catalyst before 16), so the caller can fall back.
+    /// </summary>
+    public static bool ShowMenu(IMenuFlyout flyout, IView target, CGPoint location)
+    {
+        if (!OperatingSystem.IsMacCatalystVersionAtLeast(16) ||
+            target.Handler is not IPlatformViewHandler { PlatformView: UIView anchor, MauiContext: { } mauiContext } ||
+            anchor.Window is null)
+        {
+            return false;
+        }
+
+        foreach (var stale in anchor.Interactions.OfType<MenuAtPointInteraction>().ToArray())
+        {
+            anchor.RemoveInteraction(stale);
+        }
+
+        (flyout as ContextMenuFlyout)?.RaiseOpening();
+        var elements = BuildMenuElements(flyout, mauiContext);
+        if (elements.Length == 0)
+        {
+            // Every item hidden: UWP shows nothing.
+            return true;
+        }
+
+        // On the Mac an edit menu is presented as a context menu at its source point, which is the
+        // public way to open one from code.
+        var interaction = new MenuAtPointInteraction(new MenuAtPointDelegate(flyout, UIMenu.Create(string.Empty, null, UIMenuIdentifier.None, 0, elements)));
+        anchor.AddInteraction(interaction);
+        ContextMenuFlyout.OpenContextMenu = flyout;
+        interaction.PresentEditMenu(UIEditMenuConfiguration.Create(null, location));
+        return true;
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("maccatalyst16.0")]
+    private sealed class MenuAtPointInteraction : UIEditMenuInteraction
+    {
+        public MenuAtPointInteraction(IUIEditMenuInteractionDelegate interactionDelegate)
+            : base(interactionDelegate)
+        {
+        }
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("maccatalyst16.0")]
+    private sealed class MenuAtPointDelegate : UIEditMenuInteractionDelegate
+    {
+        private readonly IMenuFlyout _flyout;
+        private readonly UIMenu _menu;
+
+        public MenuAtPointDelegate(IMenuFlyout flyout, UIMenu menu)
+        {
+            _flyout = flyout;
+            _menu = menu;
+        }
+
+        // Only the app's items: the suggested edit actions (Cut, Copy, ...) are left out.
+        public override UIMenu? GetMenu(UIEditMenuInteraction interaction, UIEditMenuConfiguration configuration, UIMenuElement[] suggestedActions) => _menu;
+
+        public override void WillDismissMenu(UIEditMenuInteraction interaction, UIEditMenuConfiguration configuration, IUIEditMenuInteractionAnimating animator)
+        {
+            if (ReferenceEquals(ContextMenuFlyout.OpenContextMenu, _flyout))
+            {
+                ContextMenuFlyout.OpenContextMenu = null;
+            }
+
+            // Closed follows the chosen item's action, as in UWP.
+            void Finish()
+            {
+                interaction.View?.RemoveInteraction(interaction);
+                (_flyout as ContextMenuFlyout)?.RaiseClosed();
+            }
+
+            if (animator is not null)
+            {
+                animator.AddCompletion(Finish);
+            }
+            else
+            {
+                Finish();
+            }
+        }
+    }
+
     /// <summary>Marks the context-menu interaction this class adds, so it never touches others.</summary>
     private sealed class ContextFlyoutInteraction : UIContextMenuInteraction
     {
@@ -134,6 +221,11 @@ public static class ContextMenuSupport
                     if (!item.IsEnabled)
                     {
                         action.Attributes = UIMenuElementAttributes.Disabled;
+                    }
+
+                    if (item is AppToggleMenuItem { IsChecked: true })
+                    {
+                        action.State = UIMenuElementState.On;
                     }
 
                     if (item is BindableObject menuItem && SemanticProperties.GetDescription(menuItem) is { Length: > 0 } description)

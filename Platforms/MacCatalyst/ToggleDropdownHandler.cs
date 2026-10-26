@@ -33,6 +33,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         [nameof(ToggleDropdown.DropdownIndicatorFontFamily)] = MapColor,
         [nameof(ToggleDropdown.ChangeUnselectedTextOnSelectionChange)] = MapText,
         [nameof(ToggleDropdown.IsActionMenu)] = MapIsActionMenu,
+        [nameof(ToggleDropdown.IsMenuButton)] = MapIsActionMenu,
         [nameof(ToggleDropdown.IconGlyph)] = MapIcon,
         [nameof(ToggleDropdown.IconFontFamily)] = MapIcon,
         [nameof(ToggleDropdown.SystemIconName)] = MapIcon,
@@ -177,17 +178,17 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
     }
 
     // UWP: a click checks an unchecked dropdown; clicking it once checked opens its options (an
-    // action menu opens them on every click).
+    // action menu or menu button opens them on every click).
     private void ButtonTapped(object? sender, EventArgs e)
     {
-        if (!VirtualView.IsActionMenu && !VirtualView.IsChecked)
+        if (!VirtualView.OpensOnClick && !VirtualView.IsChecked)
         {
             VirtualView.MarkNextToggleAsUserInitiated();
             VirtualView.IsChecked = true;
             return;
         }
 
-        if (VirtualView.Options is { Count: > 0 } options && (VirtualView.IsActionMenu || options.Count > 1))
+        if (VirtualView.Options is { Count: > 0 } options && (VirtualView.OpensOnClick || options.Count > 1))
         {
             ShowOptions(options);
         }
@@ -214,7 +215,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         var selectedOption = VirtualView.Options[index];
 
         VirtualView.MarkNextSelectionAsUserInitiated();
-        if (!VirtualView.IsActionMenu)
+        if (!VirtualView.OpensOnClick)
         {
             VirtualView.MarkNextToggleAsUserInitiated();
             VirtualView.IsChecked = true;
@@ -278,8 +279,8 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
             return;
         }
 
-        var hasMenu = view.Options is { Count: > 1 } && !view.IsActionMenu;
-        _indicatorView.Hidden = !(hasMenu && view.IsChecked);
+        var hasMenu = view.Options is { Count: > 1 };
+        _indicatorView.Hidden = !(hasMenu && view.ShowsCheckedState);
         if (_indicatorView.Hidden)
         {
             return;
@@ -372,7 +373,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
     private static void UpdateAccessibility(UIButton button, ToggleDropdown view)
     {
         var title = button.Configuration?.Title;
-        ButtonAccessibility.Update(button, view, isToggle: !view.IsActionMenu, isOn: !view.IsActionMenu && view.IsChecked, text: title);
+        ButtonAccessibility.Update(button, view, isToggle: !view.OpensOnClick, isOn: view.ShowsCheckedState, text: title);
         if (!view.IsActionMenu && view.SelectedOption?.Text is { Length: > 0 } option && option != button.AccessibilityLabel)
         {
             button.AccessibilityValue = option;
@@ -381,7 +382,7 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
 
     private static void UpdateButtonAppearance(UIButton button, ToggleDropdown view)
     {
-        var visuallySelected = !view.IsActionMenu && view.IsChecked;
+        var visuallySelected = view.ShowsCheckedState;
 
         // UWP template: theme foreground normally, the accent only in the Checked states. Dynamic
         // UIColors re-resolve on appearance changes, and template-rendered glyphs pick them up.
