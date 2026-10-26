@@ -172,6 +172,23 @@ public sealed partial class ToggleDropdown : ContentView
     public static readonly BindableProperty IsActionMenuProperty =
         BindableProperty.Create(nameof(IsActionMenu), typeof(bool), typeof(ToggleDropdown), false);
 
+    // A plain button whose menu picks one option (UWP: a Button whose MenuFlyout holds radio
+    // ToggleMenuFlyoutItems): every click opens the options and the chosen one stays marked, but the
+    // button itself is never checked, so it keeps the theme foreground and draws no indicator.
+    public bool IsMenuButton
+    {
+        get => (bool)GetValue(IsMenuButtonProperty);
+        set => SetValue(IsMenuButtonProperty, value);
+    }
+    public static readonly BindableProperty IsMenuButtonProperty =
+        BindableProperty.Create(nameof(IsMenuButton), typeof(bool), typeof(ToggleDropdown), false);
+
+    // Whether a click opens the options straight away rather than first checking the dropdown.
+    internal bool OpensOnClick => IsActionMenu || IsMenuButton;
+
+    // Whether the dropdown draws as checked (accent foreground, trailing indicator).
+    internal bool ShowsCheckedState => !OpensOnClick && IsChecked;
+
     public string IconGlyph
     {
         get => (string)GetValue(IconGlyphProperty);
