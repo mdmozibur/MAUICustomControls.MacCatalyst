@@ -18,6 +18,17 @@ public sealed class ComboBoxHost : StackPanel
     {
         Spacing = 4;
         Children.Add(Box);
+
+        // Without a background only the field's outline and text glyphs are hit-testable, so a
+        // click inside the field fell through to whatever was behind it.
+        Box.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty && Box.Background is null)
+            {
+                Box.Background = Brushes.Transparent;
+            }
+        };
+        Box.TemplateApplied += (_, _) => Box.Background ??= Brushes.Transparent;
     }
 
     public AvaloniaComboBox Box { get; } = new() { HorizontalAlignment = HorizontalAlignment.Stretch, MinWidth = 0 };

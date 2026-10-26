@@ -31,6 +31,7 @@ public sealed class PopoverButtonHandler : AvaloniaContentViewHandler
         base.ConnectHandler(platformView);
         platformView.Focusable = true;
         platformView.Background ??= Brushes.Transparent; // Hit-testable across its whole face.
+        platformView.PropertyChanged += OnPlatformPropertyChanged;
         platformView.PointerPressed += OnPointerPressed;
         platformView.PointerReleased += OnPointerReleased;
         platformView.KeyDown += OnKeyDown;
@@ -44,6 +45,7 @@ public sealed class PopoverButtonHandler : AvaloniaContentViewHandler
 
     protected override void DisconnectHandler(AvaloniaContentView platformView)
     {
+        platformView.PropertyChanged -= OnPlatformPropertyChanged;
         platformView.PointerPressed -= OnPointerPressed;
         platformView.PointerReleased -= OnPointerReleased;
         platformView.KeyDown -= OnKeyDown;
@@ -57,6 +59,16 @@ public sealed class PopoverButtonHandler : AvaloniaContentViewHandler
         HideFlyout();
         ReleaseFlyout();
         base.DisconnectHandler(platformView);
+    }
+
+    // ContentView's Background mapping runs after ConnectHandler and clears the brush of a button
+    // without a background, which left only its text clickable.
+    private void OnPlatformPropertyChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property.Name == nameof(AvaloniaContentView.Background) && PlatformView is { Background: null } view)
+        {
+            view.Background = Brushes.Transparent;
+        }
     }
 
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
