@@ -28,6 +28,31 @@ public static class LinuxHandlers
         ListNotifyingItemsSources();
         LetUnpaintedLayoutsPassInput();
         ShowContextMenusThroughPresenter();
+        RespectTransformAnchors();
+    }
+
+    /// <summary>
+    /// The backend scales and rotates every view about its centre, whatever its AnchorX/AnchorY: a
+    /// zooming scroll view (anchored at its top-left) slid the plot preview's sheet down and to the
+    /// right. The view's anchors become the transform origin, after the backend's own (deferred)
+    /// transform update.
+    /// </summary>
+    private static void RespectTransformAnchors()
+    {
+        foreach (var key in new[] { nameof(IView.AnchorX), nameof(IView.AnchorY), nameof(IView.Scale), nameof(IView.ScaleX),
+                     nameof(IView.ScaleY), nameof(IView.Rotation), nameof(IView.RotationX), nameof(IView.RotationY) })
+        {
+            Avalonia.Controls.Maui.Handlers.ViewHandler.ViewMapper.AppendToMapping(key, (handler, view) =>
+            {
+                if (handler.PlatformView is not Avalonia.Controls.Control control)
+                {
+                    return;
+                }
+
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    control.RenderTransformOrigin = new Avalonia.RelativePoint(view.AnchorX, view.AnchorY, Avalonia.RelativeUnit.Relative));
+            });
+        }
     }
 
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Avalonia.Controls.Control, Microsoft.Maui.Controls.VisualElement> ContextMenuOwners = new();
