@@ -238,8 +238,8 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
         var width = IsExplicit(view.Width) ? view.Width : Math.Min(widthConstraint, view.MaximumWidth);
         var height = IsExplicit(view.Height) ? view.Height : Math.Min(heightConstraint, view.MaximumHeight);
         var fits = PlatformView.SizeThatFits(new CGSize(
-            double.IsFinite(width) ? width : nfloat.PositiveInfinity,
-            double.IsFinite(height) ? height : nfloat.PositiveInfinity));
+            GlyphImageRenderer.LayoutConstraint(width),
+            GlyphImageRenderer.LayoutConstraint(height)));
 
         return new Size(
             Resolve((double)fits.Width, view.Width, view.MinimumWidth, view.MaximumWidth),
@@ -563,18 +563,12 @@ public sealed class ToggleDropdownHandler : ViewHandler<ToggleDropdown, UIButton
             ForegroundColor = UIColor.Black,
         };
 
-        using var glyphText = new NSString(glyph);
-        var textSize = glyphText.GetSizeUsingAttributes(attributes);
-        var width = (nfloat)Math.Ceiling(Math.Max(textSize.Width, resolvedFontSize));
-        var height = (nfloat)Math.Ceiling(Math.Max(textSize.Height, resolvedFontSize));
-        var imageSize = new CGSize(width, height);
-
-        var drawPoint = new CGPoint(
-            Math.Max((width - textSize.Width) / 2f, 0f),
-            Math.Max((height - textSize.Height) / 2f, 0f));
-        var renderer = new UIGraphicsImageRenderer(imageSize);
-        var image = renderer.CreateImage(_ => glyphText.DrawString(drawPoint, attributes));
-        return image.ImageWithRenderingMode(UIImageRenderingMode.AlwaysTemplate);
+        using var glyphText = new NSAttributedString(glyph, attributes);
+        var textSize = glyphText.Size;
+        var layoutSize = new CGSize(
+            Math.Ceiling(Math.Max(textSize.Width, resolvedFontSize)),
+            Math.Ceiling(Math.Max(textSize.Height, resolvedFontSize)));
+        return GlyphImageRenderer.Render(glyphText, layoutSize, UIImageRenderingMode.AlwaysTemplate);
     }
 
     private static UIFont ApplyFontAttributes(UIFont? font, nfloat fontSize, FontAttributes fontAttributes)

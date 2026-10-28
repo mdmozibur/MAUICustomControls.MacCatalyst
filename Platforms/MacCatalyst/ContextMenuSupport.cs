@@ -278,8 +278,8 @@ public static class ContextMenuSupport
                 UIImage? image = null;
                 if (size.Width > 0 && size.Height > 0)
                 {
-                    var renderer = new UIGraphicsImageRenderer(new CGSize(Math.Ceiling((double)size.Width), Math.Ceiling((double)size.Height)));
-                    image = renderer.CreateImage(_ => text.DrawString(CGPoint.Empty)).ImageWithRenderingMode(UIImageRenderingMode.AlwaysTemplate);
+                    var layoutSize = new CGSize(Math.Ceiling((double)size.Width), Math.Ceiling((double)size.Height));
+                    image = GlyphImageRenderer.Render(text, layoutSize, UIImageRenderingMode.AlwaysTemplate);
                 }
 
                 lock (FontIcons)
