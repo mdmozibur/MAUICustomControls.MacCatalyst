@@ -129,6 +129,16 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         UpdateButtonAppearance(PlatformView, VirtualView);
     }
 
+    // The icon image can hold glyph ink beyond its line box; measured against a bounded size, the
+    // button lays it out by the line box, as UWP measures a FontIcon.
+    public override Size GetDesiredSize(double widthConstraint, double heightConstraint)
+    {
+        var size = base.GetDesiredSize(
+            GlyphImageRenderer.LayoutConstraint(widthConstraint),
+            GlyphImageRenderer.LayoutConstraint(heightConstraint));
+        return new Size(Math.Min(size.Width, widthConstraint), Math.Min(size.Height, heightConstraint));
+    }
+
     private void ConfigureButton(UIButton button)
     {
         button.ChangesSelectionAsPrimaryAction = true;
@@ -391,18 +401,12 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
             ForegroundColor = tintColor,
         };
 
-        using var glyphText = new NSString(glyph);
-        var textSize = glyphText.GetSizeUsingAttributes(attributes);
-        var width = (nfloat)Math.Ceiling(Math.Max(textSize.Width, resolvedFontSize));
-        var height = (nfloat)Math.Ceiling(Math.Max(textSize.Height, resolvedFontSize));
-        var imageSize = new CGSize(width, height);
-
-        var drawPoint = new CGPoint(
-            Math.Max((width - textSize.Width) / 2f, 0f),
-            Math.Max((height - textSize.Height) / 2f, 0f));
-        var renderer = new UIGraphicsImageRenderer(imageSize);
-        var image = renderer.CreateImage(_ => glyphText.DrawString(drawPoint, attributes));
-        return image.ImageWithRenderingMode(UIImageRenderingMode.AlwaysOriginal);
+        using var glyphText = new NSAttributedString(glyph, attributes);
+        var textSize = glyphText.Size;
+        var layoutSize = new CGSize(
+            Math.Ceiling(Math.Max(textSize.Width, resolvedFontSize)),
+            Math.Ceiling(Math.Max(textSize.Height, resolvedFontSize)));
+        return GlyphImageRenderer.Render(glyphText, layoutSize, UIImageRenderingMode.AlwaysOriginal);
     }
 
     private static UIFont? ResolvePlatformFont(string fontFamily, nfloat fontSize)

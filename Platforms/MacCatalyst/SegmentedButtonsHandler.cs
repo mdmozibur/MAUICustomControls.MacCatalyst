@@ -14,6 +14,8 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
 
     private UILabel? _headerLabel;
     private UISegmentedControl? _segmentedControl;
+    private readonly List<(string Title, UIImage? Icon)> _segments = new();
+    private nfloat? _segmentsLayoutWidth;
     private PointerHoverTracker? _hoverTracker;
     private UIView? _hoverOverlay;
 
@@ -102,7 +104,7 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
         // UIStackView sizes itself through Auto Layout, not SizeThatFits, which is what MAUI's default
         // measure asks - so the control measured as empty and was never shown. Measure the parts.
         var segments = _segmentedControl.IntrinsicContentSize;
-        double width = segments.Width;
+        double width = SegmentsLayoutWidth(_segmentedControl);
         double height = segments.Height;
 
         if (!_headerLabel.Hidden)
@@ -134,6 +136,8 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
         }
 
         handler._segmentedControl.RemoveAllSegments();
+        handler._segments.Clear();
+        handler._segmentsLayoutWidth = null;
         for (var index = 0; index < control.Items.Count; index++)
         {
             var item = control.Items[index];
@@ -143,11 +147,13 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
             if (string.IsNullOrEmpty(glyph))
             {
                 handler._segmentedControl.InsertSegment(text, index, false);
+                handler._segments.Add((text, null));
             }
             else
             {
-                handler._segmentedControl.InsertSegment(
-                    CreateIconSegmentImage(glyph, iconFontFamily, text, (nfloat)control.FontSize), index, false);
+                var icon = CreateIconSegmentImage(glyph, iconFontFamily, text, (nfloat)control.FontSize);
+                handler._segmentedControl.InsertSegment(icon, index, false);
+                handler._segments.Add((text, icon));
             }
         }
 
@@ -268,6 +274,8 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
             return;
         }
 
+        handler._segmentsLayoutWidth = null;
+
         var font = UIFont.SystemFontOfSize((nfloat)control.FontSize);
         handler._segmentedControl.SetTitleTextAttributes(
             new UIStringAttributes
@@ -306,6 +314,46 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
     }
 
     /// <summary>
+    /// The segments' width with every icon at its layout size. An icon image also holds glyph ink
+    /// past its line box (<see cref="GlyphImageRenderer"/>), and UISegmentedControl sizes a segment
+    /// by the whole image, ignoring its alignment rect: measured as is, the control would widen by
+    /// the overhang. A throwaway control with blank images of the layout size gives the width the
+    /// segments take by their line boxes; the icons' extra ink sits in the segment padding.
+    /// </summary>
+    private nfloat SegmentsLayoutWidth(UISegmentedControl control)
+    {
+        if (_segmentsLayoutWidth is { } cached)
+        {
+            return cached;
+        }
+
+        var width = control.IntrinsicContentSize.Width;
+        if (_segments.Any(segment => segment.Icon is { } icon && !icon.AlignmentRectInsets.Equals(UIEdgeInsets.Zero)))
+        {
+            using var layoutControl = new UISegmentedControl();
+            layoutControl.SetTitleTextAttributes(control.GetTitleTextAttributes(UIControlState.Normal), UIControlState.Normal);
+            for (var index = 0; index < _segments.Count; index++)
+            {
+                var (title, icon) = _segments[index];
+                if (icon is null)
+                {
+                    layoutControl.InsertSegment(title, index, false);
+                    continue;
+                }
+
+                var insets = icon.AlignmentRectInsets;
+                var layoutSize = new CGSize(icon.Size.Width - insets.Left - insets.Right, icon.Size.Height - insets.Top - insets.Bottom);
+                layoutControl.InsertSegment(new UIGraphicsImageRenderer(layoutSize).CreateImage(_ => { }), index, false);
+            }
+
+            width = layoutControl.IntrinsicContentSize.Width;
+        }
+
+        _segmentsLayoutWidth = width;
+        return width;
+    }
+
+    /// <summary>
     /// Draws an item's icon glyph and label into one template image.
     /// </summary>
     /// <remarks>
@@ -328,18 +376,24 @@ public sealed class SegmentedButtonsHandler : ViewHandler<SegmentedButtons, UISt
             Math.Ceiling(iconSize.Width + spacing + labelSize.Width),
             Math.Ceiling(Math.Max(iconSize.Height, labelSize.Height)));
 
-        var image = new UIGraphicsImageRenderer(imageSize).CreateImage(_ =>
+        var iconOrigin = new CGPoint(0, (imageSize.Height - iconSize.Height) / 2);
+        var labelOrigin = new CGPoint(iconSize.Width + spacing, (imageSize.Height - labelSize.Height) / 2);
+        var ink = GlyphImageRenderer.InkBounds(icon, iconOrigin);
+        if (hasText)
         {
-            icon.DrawString(new CGPoint(0, (imageSize.Height - iconSize.Height) / 2));
+            ink = ink.UnionWith(new CGRect(labelOrigin, labelSize));
+        }
+
+        // A template image is tinted by the control for its normal and selected states.
+        var segmentImage = GlyphImageRenderer.Render(imageSize, ink, UIImageRenderingMode.AlwaysTemplate, () =>
+        {
+            icon.DrawString(iconOrigin);
 
             if (hasText)
             {
-                label.DrawString(new CGPoint(iconSize.Width + spacing, (imageSize.Height - labelSize.Height) / 2));
+                label.DrawString(labelOrigin);
             }
         });
-
-        // A template image is tinted by the control for its normal and selected states.
-        var segmentImage = image.ImageWithRenderingMode(UIImageRenderingMode.AlwaysTemplate);
         segmentImage.AccessibilityLabel = hasText ? text : glyph;
         return segmentImage;
     }

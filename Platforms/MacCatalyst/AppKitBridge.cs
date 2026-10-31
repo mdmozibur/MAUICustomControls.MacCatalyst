@@ -267,6 +267,21 @@ public static unsafe class AppKitBridge
     }
 
     /// <summary>
+    /// Stops AppKit from snapshotting the app's windows for state restoration (a transient
+    /// full-window bitmap of ~40 MB per capture at full-screen Retina size). Returns false when the
+    /// plug-in is missing.
+    /// </summary>
+    public static bool DisableWindowRestoration()
+    {
+        if (!TryGetExport("appkit_disable_window_restoration", out var disable))
+        {
+            return false;
+        }
+
+        return ((delegate* unmanaged<int>)disable)() != 0;
+    }
+
+    /// <summary>
     /// The CoreGraphics display ID of the screen the app's main window is on (the main screen when
     /// there is no window). False when the plug-in is missing or there is no screen.
     /// </summary>

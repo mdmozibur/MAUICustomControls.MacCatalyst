@@ -712,6 +712,64 @@ int appkit_install_window_observer(AKBWindowEvent windowEvent)
     return installed;
 }
 
+// Turns off AppKit state restoration for the app's UIKit windows. While a window is restorable,
+// NSPersistentUI re-captures it after every visible change and sends the snapshot to the
+// restoration service: a full-window bitmap plus its XPC copy, about 80 MB transient for a
+// full-screen Retina window, and that peak is what Activity Monitor shows. The app restores its
+// own window frame (WindowChrome) and documents, so it needs neither the snapshot nor the restored
+// window. Windows created later are caught when they first go on screen or become key, before
+// AppKit's first capture.
+static NSMutableArray *gRestorationObservers;
+
+static void AKBMakeNotRestorable(NSWindow *window)
+{
+    if (window.restorable && AKBIsUIKitWindow(window))
+    {
+        window.restorable = NO;
+    }
+}
+
+__attribute__((visibility("default")))
+int appkit_disable_window_restoration(void)
+{
+    __block int installed = 0;
+    dispatch_block_t install = ^{
+        for (NSWindow *window in NSApp.windows)
+        {
+            AKBMakeNotRestorable(window);
+        }
+
+        if (gRestorationObservers == nil)
+        {
+            // A window launched in the background never becomes key, but it gets an occlusion
+            // change when it first goes on screen.
+            gRestorationObservers = [NSMutableArray array];
+            for (NSNotificationName name in @[NSWindowDidBecomeKeyNotification, NSWindowDidChangeOcclusionStateNotification])
+            {
+                [gRestorationObservers addObject:[[NSNotificationCenter defaultCenter] addObserverForName:name
+                                                                                                   object:nil
+                                                                                                    queue:nil
+                                                                                               usingBlock:^(NSNotification *notification) {
+                    AKBMakeNotRestorable(notification.object);
+                }]];
+            }
+        }
+
+        installed = 1;
+    };
+
+    if ([NSThread isMainThread])
+    {
+        install();
+    }
+    else
+    {
+        dispatch_sync(dispatch_get_main_queue(), install);
+    }
+
+    return installed;
+}
+
 // The visible frame (no menu bar or Dock) of the screen that holds most of the given rectangle, or of
 // the main screen when it is on none, in UIKit system coordinates (top-left origin at the primary
 // screen's top-left). Returns 1 when the rectangle overlaps a screen, 0 when it fell back.
