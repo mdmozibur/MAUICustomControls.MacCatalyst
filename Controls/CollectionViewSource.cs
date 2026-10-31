@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Specialized;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 
 namespace MAUICustomControls.MacCatalyst.Controls;
@@ -55,6 +56,7 @@ public sealed class CollectionViewSource : BindableObject
     {
         if (bindable is CollectionViewSource cvs)
         {
+            cvs._view?.Dispose();
             cvs._view = new CollectionViewData(newValue as IEnumerable);
             cvs.OnPropertyChanged(nameof(View));
             cvs.OnPropertyChanged(nameof(CollectionGroups));
@@ -66,9 +68,10 @@ public sealed class CollectionViewSource : BindableObject
 /// Wraps a grouped source collection, providing both IEnumerable iteration
 /// (for use as ItemsSource) and a CollectionGroups property (for zoomed-out views).
 /// </summary>
-public sealed class CollectionViewData : IEnumerable, INotifyCollectionChanged
+public sealed class CollectionViewData : IEnumerable, INotifyCollectionChanged, IDisposable
 {
     private readonly IEnumerable? _source;
+    private readonly ObservableCollection<CollectionViewGroup> _groups = new();
 
     public CollectionViewData(IEnumerable? source)
     {
@@ -76,8 +79,9 @@ public sealed class CollectionViewData : IEnumerable, INotifyCollectionChanged
 
         if (_source is INotifyCollectionChanged ncc)
         {
-            ncc.CollectionChanged += (s, e) => CollectionChanged?.Invoke(this, e);
+            ncc.CollectionChanged += SourceChanged;
         }
+        UpdateGroups();
     }
 
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
@@ -85,20 +89,37 @@ public sealed class CollectionViewData : IEnumerable, INotifyCollectionChanged
     /// <summary>
     /// Returns each top-level group wrapped in a <see cref="CollectionViewGroup"/>.
     /// </summary>
-    public IReadOnlyList<CollectionViewGroup> CollectionGroups
-    {
-        get
-        {
-            if (_source is null)
-                return Array.Empty<CollectionViewGroup>();
+    public IReadOnlyList<CollectionViewGroup> CollectionGroups => _groups;
 
-            var groups = new List<CollectionViewGroup>();
-            foreach (var item in _source)
-            {
-                groups.Add(new CollectionViewGroup(item));
-            }
-            return groups;
+    private void SourceChanged(object? sender, NotifyCollectionChangedEventArgs args)
+    {
+        UpdateGroups();
+        CollectionChanged?.Invoke(this, args);
+    }
+
+    private void UpdateGroups()
+    {
+        var available = _groups.ToList();
+        var desired = new List<CollectionViewGroup>();
+        if (_source is not null) foreach (var group in _source)
+        {
+            var index = available.FindIndex(item => ReferenceEquals(item.Group, group) || Equals(item.Group, group));
+            var wrapper = index >= 0 ? available[index] : new CollectionViewGroup(group);
+            if (index >= 0) available.RemoveAt(index);
+            desired.Add(wrapper);
         }
+        foreach (var removed in available) _groups.Remove(removed);
+        for (var i = 0; i < desired.Count; i++)
+        {
+            var index = _groups.IndexOf(desired[i]);
+            if (index < 0) _groups.Insert(i, desired[i]);
+            else if (index != i) _groups.Move(index, i);
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_source is INotifyCollectionChanged notifications) notifications.CollectionChanged -= SourceChanged;
     }
 
     public IEnumerator GetEnumerator() => _source?.GetEnumerator() ?? Enumerable.Empty<object>().GetEnumerator();

@@ -11,9 +11,11 @@ public sealed class ContentButton : ContentView
 
 	public ContentButton()
 	{
+#if !LINUX
 		var tapGestureRecognizer = new TapGestureRecognizer();
 		tapGestureRecognizer.Tapped += OnTapped;
 		GestureRecognizers.Add(tapGestureRecognizer);
+#endif
 
 		// The button chrome (a UWP Button's border and rounded corners) is painted on the native
 		// layer, like the bordered panels; the converted app's implicit ContentButton style gives it
@@ -163,6 +165,8 @@ public sealed class ContentButton : ContentView
 	}
 
 	public event EventHandler? Clicked;
+
+	internal void RaiseClicked() => Clicked?.Invoke(this, EventArgs.Empty);
 
 	private static void OnButtonFaceChanged(BindableObject bindable, object? oldValue, object? newValue)
 	{

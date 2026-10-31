@@ -14,6 +14,12 @@ public sealed class SemanticZoom : ContentView
     private bool _isTransitioning;
     private GroupableItemsView? _wiredZoomedOutItemsView;
     private object? _pendingNavigationGroup;
+#if LINUX
+    private GroupableItemsView? _headerItemsView;
+    private DataTemplate? _originalHeaderTemplate;
+    private DataTemplate? _wrappedHeaderTemplate;
+    private bool _updatingHeaderTemplate;
+#endif
 
     public static readonly BindableProperty ZoomedInViewProperty =
         BindableProperty.Create(nameof(ZoomedInView), typeof(View), typeof(SemanticZoom), null, propertyChanged: OnViewChanged);
@@ -75,9 +81,11 @@ public sealed class SemanticZoom : ContentView
     {
         Content = _container;
 
+#if !LINUX
         var doubleTap = new TapGestureRecognizer { NumberOfTapsRequired = 2 };
         doubleTap.Tapped += (_, _) => ToggleActiveView();
         GestureRecognizers.Add(doubleTap);
+#endif
     }
 
     public void ToggleActiveView()
@@ -142,6 +150,51 @@ public sealed class SemanticZoom : ContentView
 
         itemsView.SelectionChanged += OnZoomedOutSelectionChanged;
     }
+
+#if LINUX
+    private void WireZoomedInHeaders()
+    {
+        var items = FindGroupableItemsView(ZoomedInView);
+        if (!ReferenceEquals(items, _headerItemsView))
+        {
+            if (_headerItemsView is { } previous)
+            {
+                previous.PropertyChanged -= HeaderTemplateChanged;
+                if (ReferenceEquals(previous.GroupHeaderTemplate, _wrappedHeaderTemplate))
+                    previous.GroupHeaderTemplate = _originalHeaderTemplate;
+            }
+            _headerItemsView = items;
+            _wrappedHeaderTemplate = null;
+            if (items is not null) items.PropertyChanged += HeaderTemplateChanged;
+        }
+        if (items is null || ReferenceEquals(items.GroupHeaderTemplate, _wrappedHeaderTemplate)) return;
+        _originalHeaderTemplate = items.GroupHeaderTemplate;
+        if (_originalHeaderTemplate is not { } original) return;
+        _wrappedHeaderTemplate = new DataTemplate(() =>
+        {
+            var host = new ContentView { BackgroundColor = Colors.Transparent };
+            host.BindingContextChanged += (_, _) =>
+            {
+                if (host.BindingContext is null) { host.Content = null; return; }
+                var template = original is DataTemplateSelector selector ? selector.SelectTemplate(host.BindingContext, items) : original;
+                var content = template?.CreateContent();
+                host.Content = content as View ?? (content as ViewCell)?.View;
+                if (host.Content is { } child) child.BindingContext = host.BindingContext;
+            };
+            var tap = new TapGestureRecognizer();
+            tap.Tapped += (_, _) => IsZoomedInViewActive = false;
+            host.GestureRecognizers.Add(tap);
+            return host;
+        });
+        _updatingHeaderTemplate = true;
+        try { items.GroupHeaderTemplate = _wrappedHeaderTemplate; }
+        finally { _updatingHeaderTemplate = false; }
+    }
+    private void HeaderTemplateChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (!_updatingHeaderTemplate && args.PropertyName == nameof(GroupableItemsView.GroupHeaderTemplate)) WireZoomedInHeaders();
+    }
+#endif
 
     private void ScrollZoomedInViewToPendingGroup()
     {
@@ -282,6 +335,9 @@ public sealed class SemanticZoom : ContentView
         }
 
         WireZoomedOutNavigation();
+#if LINUX
+        WireZoomedInHeaders();
+#endif
     }
 
     private static void OnViewChanged(BindableObject bindable, object? oldValue, object? newValue)

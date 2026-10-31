@@ -1,4 +1,5 @@
 using Microsoft.Maui.Hosting;
+using Avalonia.VisualTree;
 
 namespace MAUICustomControls.MacCatalyst.Platforms.Linux;
 
@@ -12,6 +13,7 @@ public static class LinuxHandlers
 {
     public static void Register(IMauiHandlersCollection handlers)
     {
+        handlers.AddHandler(typeof(Microsoft.Maui.Controls.Label), typeof(LinuxLabelHandler));
         handlers.AddHandler(typeof(Controls.ToggleButton), typeof(ToggleButtonHandler));
         handlers.AddHandler(typeof(Controls.CheckBox), typeof(CheckBoxHandler));
         handlers.AddHandler(typeof(Controls.ToggleSwitch), typeof(ToggleSwitchHandler));
@@ -22,6 +24,13 @@ public static class LinuxHandlers
         handlers.AddHandler(typeof(Controls.ProgressRing), typeof(ProgressRingHandler));
         handlers.AddHandler(typeof(Controls.AnimatedVisualPlayer), typeof(AnimatedVisualPlayerHandler));
         handlers.AddHandler(typeof(Controls.AppMenuBarHost), typeof(AppMenuBarHostHandler));
+        handlers.AddHandler(typeof(Controls.ColorSpectrum), typeof(ColorSpectrumHandler));
+        handlers.AddHandler(typeof(Controls.ColorPickerSlider), typeof(ColorPickerSliderHandler));
+        handlers.AddHandler(typeof(Controls.ColorWell), typeof(ColorWellHandler));
+        handlers.AddHandler(typeof(Controls.AccessibleItemView), typeof(AccessibleItemHandler));
+        handlers.AddHandler(typeof(Controls.TabItem), typeof(AccessibleItemHandler));
+        handlers.AddHandler(typeof(Controls.ContentButton), typeof(ContentButtonHandler));
+        handlers.AddHandler(typeof(Controls.SemanticZoom), typeof(SemanticZoomHandler));
 
         TreatColorlessBrushesAsEmpty();
         JustifyLabels();
@@ -29,6 +38,29 @@ public static class LinuxHandlers
         LetUnpaintedLayoutsPassInput();
         ShowContextMenusThroughPresenter();
         RespectTransformAnchors();
+        ArrangeChangedLayouts();
+    }
+
+    // Replacing children can leave a cross-platform panel's desired size unchanged.
+    // The backend invalidates measure, but its new children still need an arrange
+    // pass even when the containing pane retains its previous dimensions. Clear
+    // the containing native panels' caches too, or a cached parent can skip it.
+    private static void ArrangeChangedLayouts()
+    {
+        foreach (var command in new[] { "Add", "Insert", "Update", "Remove", "Clear" })
+            Avalonia.Controls.Maui.Handlers.LayoutHandler.CommandMapper.AppendToMapping(command,
+                (handler, _, _) =>
+                {
+                    if (handler.PlatformView is not { } panel) return;
+                    for (Avalonia.Visual? visual = panel; visual is not null; visual = visual.GetVisualParent())
+                    {
+                        if (visual is Avalonia.Controls.Control control)
+                        {
+                            control.InvalidateMeasure();
+                            control.InvalidateArrange();
+                        }
+                    }
+                });
     }
 
     /// <summary>
