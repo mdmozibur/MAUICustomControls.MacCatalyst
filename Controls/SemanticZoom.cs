@@ -76,6 +76,9 @@ public sealed class SemanticZoom : ContentView
     /// Parameters: (View incoming, View outgoing, bool zoomingOut, Action onComplete)
     /// </summary>
     internal Action<View, View, bool, Action>? PlatformAnimateTransition { get; set; }
+#if LINUX
+    internal Action<GroupableItemsView, int>? PlatformScrollToGroup { get; set; }
+#endif
 
     public SemanticZoom()
     {
@@ -213,7 +216,16 @@ public sealed class SemanticZoom : ContentView
 
         // Dispatch so the (possibly just-made-visible) view has a chance to lay out.
         Dispatcher.Dispatch(() =>
-            itemsView.ScrollTo(index: 0, groupIndex: groupIndex, position: ScrollToPosition.Start, animate: false));
+        {
+#if LINUX
+            if (PlatformScrollToGroup is { } scroll)
+            {
+                scroll(itemsView, groupIndex);
+                return;
+            }
+#endif
+            itemsView.ScrollTo(index: 0, groupIndex: groupIndex, position: ScrollToPosition.Start, animate: false);
+        });
     }
 
     private static int IndexOfGroup(System.Collections.IEnumerable itemsSource, object group)

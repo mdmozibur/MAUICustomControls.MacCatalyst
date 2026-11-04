@@ -30,6 +30,10 @@ internal static class BorderedLayoutChrome
 
     public static void Apply(VisualElement element, Brush? borderBrush, Thickness borderThickness, CornerRadius cornerRadius)
     {
+#if LINUX
+        if (element.Handler?.PlatformView is Platforms.Linux.BorderedLayoutPanel panel)
+            panel.UpdateChrome(borderBrush, borderThickness, cornerRadius);
+#endif
 #if MACCATALYST
         if (element.Handler?.PlatformView is not UIView platformView)
         {
@@ -113,8 +117,11 @@ internal static class BorderedLayoutChrome
 /// StackLayout that renders a UWP-style border. Drop-in replacement for a UWP StackPanel that set
 /// BorderBrush / BorderThickness / CornerRadius.
 /// </summary>
-public class BorderedStackLayout : StackLayout
+public class BorderedStackLayout : StackLayout, IPadding
 {
+    Thickness IPadding.Padding => BorderPadding(Padding, BorderThickness);
+    private static Thickness BorderPadding(Thickness padding, Thickness border) => new(
+        padding.Left + border.Left, padding.Top + border.Top, padding.Right + border.Right, padding.Bottom + border.Bottom);
     public static readonly BindableProperty BorderBrushProperty = BindableProperty.Create(
         nameof(BorderBrush), typeof(Brush), typeof(BorderedStackLayout), null, propertyChanged: OnChromeChanged);
 
@@ -154,6 +161,7 @@ public class BorderedStackLayout : StackLayout
         _ = oldValue;
         _ = newValue;
         ((BorderedStackLayout)bindable).ApplyChrome();
+        ((IView)bindable).InvalidateMeasure();
     }
 
     private void ApplyChrome() => BorderedLayoutChrome.Apply(this, BorderBrush, BorderThickness, CornerRadius);
@@ -163,8 +171,10 @@ public class BorderedStackLayout : StackLayout
 /// Grid that renders a UWP-style border. Drop-in replacement for a UWP Grid that set
 /// BorderBrush / BorderThickness / CornerRadius.
 /// </summary>
-public class BorderedGrid : Grid
+public class BorderedGrid : Grid, IPadding
 {
+    Thickness IPadding.Padding => new(Padding.Left + BorderThickness.Left, Padding.Top + BorderThickness.Top,
+        Padding.Right + BorderThickness.Right, Padding.Bottom + BorderThickness.Bottom);
     public static readonly BindableProperty BorderBrushProperty = BindableProperty.Create(
         nameof(BorderBrush), typeof(Brush), typeof(BorderedGrid), null, propertyChanged: OnChromeChanged);
 
@@ -204,6 +214,7 @@ public class BorderedGrid : Grid
         _ = oldValue;
         _ = newValue;
         ((BorderedGrid)bindable).ApplyChrome();
+        ((IView)bindable).InvalidateMeasure();
     }
 
     private void ApplyChrome() => BorderedLayoutChrome.Apply(this, BorderBrush, BorderThickness, CornerRadius);

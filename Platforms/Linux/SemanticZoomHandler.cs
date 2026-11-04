@@ -10,14 +10,38 @@ using NativeContentView = Avalonia.Controls.Maui.Platform.ContentView;
 
 public sealed class SemanticZoomHandler : Avalonia.Controls.Maui.Handlers.ContentViewHandler
 {
-    protected override NativeContentView CreatePlatformView() => new SemanticZoomView
+    protected override NativeContentView CreatePlatformView()
     {
-        CrossPlatformLayout = VirtualView, Owner = (SemanticZoom)VirtualView,
-    };
+        var owner = (SemanticZoom)VirtualView;
+        owner.PlatformScrollToGroup = ScrollToGroup;
+        return new SemanticZoomView { CrossPlatformLayout = VirtualView, Owner = owner };
+    }
     protected override void DisconnectHandler(NativeContentView native)
     {
-        ((SemanticZoomView)native).Owner = null;
+        var view = (SemanticZoomView)native;
+        if (view.Owner is { } owner) owner.PlatformScrollToGroup = null;
+        view.Owner = null;
         base.DisconnectHandler(native);
+    }
+    private static void ScrollToGroup(Microsoft.Maui.Controls.GroupableItemsView items, int groupIndex)
+    {
+        if (items.Handler?.PlatformView is not Avalonia.Controls.Maui.MauiCollectionView native || items.ItemsSource is null) return;
+        // The backend ignores groupIndex and treats index as an index into its
+        // flattened source, which also contains group headers and footers.
+        var flatIndex = 0;
+        var index = 0;
+        foreach (var group in items.ItemsSource)
+        {
+            if (index++ == groupIndex)
+            {
+                native.ScrollTo(flatIndex, -1, Microsoft.Maui.Controls.ScrollToPosition.Start, animate: false);
+                return;
+            }
+            if (items.GroupHeaderTemplate is not null) flatIndex++;
+            if (group is System.Collections.IEnumerable children)
+                foreach (var _ in children) flatIndex++;
+            if (items.GroupFooterTemplate is not null) flatIndex++;
+        }
     }
 }
 
@@ -34,7 +58,7 @@ public sealed class SemanticZoomView : NativeContentView
             if (args.Scale < .9) SetView(false);
             else if (args.Scale > 1.1) SetView(true);
             args.Handled = true;
-        }, RoutingStrategies.Tunnel);
+        }, RoutingStrategies.Bubble);
     }
     private void SetView(bool zoomedIn)
     {

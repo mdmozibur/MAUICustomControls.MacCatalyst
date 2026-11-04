@@ -36,20 +36,23 @@ public sealed class DialogPresentation
 {
     private const double WindowMargin = 24;
     private static int _openCount;
+    private static readonly List<DialogPresentation> Presentations = new();
 
     private readonly Window _window;
     private readonly OverlayLayer _layer;
     private readonly Panel _scrim;
     private readonly Border _card;
     private readonly DialogPresentationOptions _options;
+    private readonly MauiView _content;
     private IInputElement? _previousFocus;
     private bool _dismissed;
 
-    private DialogPresentation(Window window, OverlayLayer layer, Control content, DialogPresentationOptions options)
+    private DialogPresentation(Window window, OverlayLayer layer, Control content, MauiView model, DialogPresentationOptions options)
     {
         _window = window;
         _layer = layer;
         _options = options;
+        _content = model;
         var dark = window.ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark;
 
         _card = new Border
@@ -65,6 +68,7 @@ public sealed class DialogPresentation
             VerticalAlignment = VerticalAlignment.Center,
         };
         Avalonia.Automation.AutomationProperties.SetName(_card, options.AccessibilityLabel);
+        KeyboardNavigation.SetTabNavigation(_card, Avalonia.Input.KeyboardNavigationMode.Cycle);
 
         // Covers the window: dims it and swallows the pointer, so nothing beneath can be used.
         _scrim = new Panel
@@ -78,6 +82,15 @@ public sealed class DialogPresentation
     }
 
     public static bool IsAnyOpen => Volatile.Read(ref _openCount) > 0;
+    public static Microsoft.Maui.Controls.Element? ActiveContent => Presentations.LastOrDefault()?._content as Microsoft.Maui.Controls.Element;
+    public static bool IsWithinActiveDialog(Microsoft.Maui.Controls.Element? element)
+    {
+        var root = ActiveContent;
+        if (root is null) return true;
+        for (; element is not null; element = element.Parent)
+            if (ReferenceEquals(element, root)) return true;
+        return false;
+    }
 
     public event Action? Dismissed;
 
@@ -90,7 +103,7 @@ public sealed class DialogPresentation
             return null;
         }
 
-        var presentation = new DialogPresentation(window, layer, platformView, options);
+        var presentation = new DialogPresentation(window, layer, platformView, content, options);
         presentation.Show();
         return presentation;
     }
@@ -118,6 +131,7 @@ public sealed class DialogPresentation
         }
 
         _dismissed = true;
+        Presentations.Remove(this);
         _window.RemoveHandler(InputElement.KeyDownEvent, OnWindowKeyDown);
         _window.PropertyChanged -= OnWindowPropertyChanged;
         _layer.Children.Remove(_scrim);
@@ -130,12 +144,15 @@ public sealed class DialogPresentation
     private void Show()
     {
         Interlocked.Increment(ref _openCount);
+        Presentations.Add(this);
         _previousFocus = TopLevel.GetTopLevel(_window)?.FocusManager?.GetFocusedElement();
         InvalidateSize();
         _layer.Children.Add(_scrim);
 
-        // Tunnel: the dialog sees Enter and Escape before the page under it or a focused control.
-        _window.AddHandler(InputElement.KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
+        // Focused controls get first refusal (a multiline editor or an open
+        // dropdown owns Enter). The compatibility key route stops at our model
+        // root, so the drawing page cannot consume these keys first.
+        _window.AddHandler(InputElement.KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Bubble);
         _window.PropertyChanged += OnWindowPropertyChanged;
 
         // The first text field takes the keyboard, else the dialog itself, as on the Mac.

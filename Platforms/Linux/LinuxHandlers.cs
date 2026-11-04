@@ -31,6 +31,8 @@ public static class LinuxHandlers
         handlers.AddHandler(typeof(Controls.TabItem), typeof(AccessibleItemHandler));
         handlers.AddHandler(typeof(Controls.ContentButton), typeof(ContentButtonHandler));
         handlers.AddHandler(typeof(Controls.SemanticZoom), typeof(SemanticZoomHandler));
+        handlers.AddHandler(typeof(Controls.BorderedGrid), typeof(BorderedLayoutHandler));
+        handlers.AddHandler(typeof(Controls.BorderedStackLayout), typeof(BorderedLayoutHandler));
 
         TreatColorlessBrushesAsEmpty();
         JustifyLabels();
