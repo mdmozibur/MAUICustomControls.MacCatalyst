@@ -1,11 +1,12 @@
 namespace MAUICustomControls.MacCatalyst.Controls;
 
+[Microsoft.Maui.Controls.ContentProperty(nameof(Body))]
 public sealed class Expander : ContentView
 {
     private readonly Grid _rootGrid;
     private readonly ContentView _headerHost;
     private readonly ContentView _contentHost;
-    private readonly Label _chevron;
+    private readonly GraphicsView _chevron;
     private readonly AccessibleItemView _headerItem;
 
     // typeof(object), not typeof(View): UWP's Expander.Header is an object and is most often
@@ -16,6 +17,16 @@ public sealed class Expander : ContentView
 
     public static readonly BindableProperty IsExpandedProperty = BindableProperty.Create(
         nameof(IsExpanded), typeof(bool), typeof(Expander), false, BindingMode.TwoWay, propertyChanged: OnIsExpandedChanged);
+
+    // XAML assigns through the bindable property rather than the CLR setter.
+    // Keep its body separate from ContentView.Content, which owns the header and body hosts.
+    public static readonly BindableProperty BodyProperty = BindableProperty.Create(
+        nameof(Body), typeof(View), typeof(Expander), null,
+        propertyChanged: (bindable, _, value) => ((Expander)bindable)._contentHost.Content = (View?)value);
+
+    // Preserve the code-built Content API without invoking ContentView's handler
+    // mapper, which would detach the root and drop focus on every body update.
+    public new static readonly BindableProperty ContentProperty = BodyProperty;
 
     public object? Header
     {
@@ -33,13 +44,13 @@ public sealed class Expander : ContentView
 
     public Expander()
     {
-        _chevron = new Label
+        _chevron = new GraphicsView
         {
-            Text = "\u276F", // right-pointing chevron
-            FontSize = 12,
+            Drawable = new ChevronDrawable(),
             VerticalOptions = LayoutOptions.Center,
             HorizontalOptions = LayoutOptions.Center,
             WidthRequest = 20,
+            HeightRequest = 12,
             Rotation = 0,
         };
         // Decorative: the header item reports the state.
@@ -72,6 +83,7 @@ public sealed class Expander : ContentView
         {
             Role = AccessibleItemRole.Disclosure,
             Content = headerRow,
+            BackgroundColor = Colors.Transparent,
         };
         _headerItem.Invoked += (_, _) => IsExpanded = !IsExpanded;
 
@@ -135,10 +147,28 @@ public sealed class Expander : ContentView
     /// <summary>
     /// The expandable body content. In XAML this is the default content property.
     /// </summary>
+    public View? Body
+    {
+        get => (View?)GetValue(BodyProperty);
+        set => SetValue(BodyProperty, value);
+    }
+
     public new View? Content
     {
-        get => _contentHost.Content;
-        set => _contentHost.Content = value;
+        get => Body;
+        set => Body = value;
+    }
+
+    // A vector disclosure mark also works when the app's text font has no chevron glyph.
+    private sealed class ChevronDrawable : Microsoft.Maui.Graphics.IDrawable
+    {
+        public void Draw(Microsoft.Maui.Graphics.ICanvas canvas, Microsoft.Maui.Graphics.RectF dirtyRect)
+        {
+            canvas.StrokeColor = Colors.Gray;
+            canvas.StrokeSize = 1.5f;
+            canvas.DrawLine(7, 2, 12, 6);
+            canvas.DrawLine(12, 6, 7, 10);
+        }
     }
 }
 

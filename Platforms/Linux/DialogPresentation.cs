@@ -17,6 +17,7 @@ public sealed record DialogPresentationOptions
     public double MaxWidth { get; init; } = 548;
     public double MinHeight { get; init; }
     public double MaxHeight { get; init; } = 756;
+    public Microsoft.Maui.CornerRadius CornerRadius { get; init; } = new(8);
 
     /// <summary>Enter outside a multi-line text field (the default button, as in WinUI).</summary>
     public Action? OnEnter { get; init; }
@@ -61,7 +62,7 @@ public sealed class DialogPresentation
             Background = new SolidColorBrush(dark ? Color.FromRgb(0x2B, 0x2B, 0x2B) : Color.FromRgb(0xF9, 0xF9, 0xF9)),
             BorderBrush = new SolidColorBrush(dark ? Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x26, 0, 0, 0)),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = NativeRadius(options.CornerRadius),
             BoxShadow = BoxShadows.Parse("0 8 32 0 #40000000"),
             ClipToBounds = true,
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -93,6 +94,11 @@ public sealed class DialogPresentation
     }
 
     public event Action? Dismissed;
+
+    private static CornerRadius NativeRadius(Microsoft.Maui.CornerRadius radius) =>
+        new(radius.TopLeft, radius.TopRight, radius.BottomRight, radius.BottomLeft);
+
+    public void SetCornerRadius(Microsoft.Maui.CornerRadius radius) => _card.CornerRadius = NativeRadius(radius);
 
     public static DialogPresentation? Present(MauiView content, Microsoft.Maui.IMauiContext mauiContext, DialogPresentationOptions options)
     {

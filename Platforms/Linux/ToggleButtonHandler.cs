@@ -1,9 +1,11 @@
 namespace MAUICustomControls.MacCatalyst.Platforms.Linux;
 
 using Avalonia.Controls;
+using Avalonia.Controls.Maui;
 using Avalonia.Layout;
 using Avalonia.Media;
 using AvaloniaViewHandler = Avalonia.Controls.Maui.Handlers.ViewHandler;
+using Microsoft.Maui;
 using ToggleButton = MAUICustomControls.MacCatalyst.Controls.ToggleButton;
 
 /// <summary>
@@ -16,7 +18,9 @@ public sealed class ToggleButtonHandler : Avalonia.Controls.Maui.Handlers.ViewHa
     public static readonly PropertyMapper<ToggleButton, ToggleButtonHandler> Mapper = new(AvaloniaViewHandler.ViewMapper)
     {
         [nameof(ToggleButton.Text)] = MapContent,
+        [nameof(ToggleButton.Content)] = MapContent,
         [nameof(ToggleButton.FontSize)] = MapContent,
+        [nameof(ToggleButton.IconFontSize)] = MapContent,
         [nameof(ToggleButton.IconGlyph)] = MapContent,
         [nameof(ToggleButton.CustomFontFamily)] = MapContent,
         [nameof(ToggleButton.ImageSpacing)] = MapContent,
@@ -47,6 +51,7 @@ public sealed class ToggleButtonHandler : Avalonia.Controls.Maui.Handlers.ViewHa
     {
         platformView.Click -= OnClick;
         platformView.ActualThemeVariantChanged -= OnThemeChanged;
+        platformView.Child = null;
         base.DisconnectHandler(platformView);
     }
 
@@ -84,11 +89,24 @@ public sealed class ToggleButtonHandler : Avalonia.Controls.Maui.Handlers.ViewHa
             ? toggle.Foreground.ToAvaloniaBrush() ?? new SolidColorBrush(LinuxControlSupport.AccentColor(face))
             : null;
 
+        var painted=foreground ?? new SolidColorBrush(LinuxControlSupport.ThemeForeground(face));
+        if(painted is ISolidColorBrush solid)
+            toggle.ContentForeground=new Microsoft.Maui.Controls.SolidColorBrush(Microsoft.Maui.Graphics.Color.FromRgba(solid.Color.R,solid.Color.G,solid.Color.B,solid.Color.A));
+        Avalonia.Controls.Documents.TextElement.SetForeground(face,painted);
+        if(toggle.Content is { } custom && handler.MauiContext is { } context)
+        {
+            var child=(Control)custom.ToPlatform(context);
+            InheritForeground(custom);
+            child.HorizontalAlignment=toggle.HorizontalContentAlignment.ToHorizontalAlignment();
+            if(!ReferenceEquals(face.Child,child)) face.Child=child;
+            return;
+        }
+
         var content = LinuxControlSupport.BuildGlyphAndText(
             handler.MauiContext,
             toggle.IconGlyph,
             toggle.CustomFontFamily,
-            toggle.FontSize,
+            toggle.EffectiveIconFontSize,
             toggle.Text,
             toggle.FontSize,
             toggle.Orientation == Microsoft.Maui.Controls.StackOrientation.Horizontal ? Orientation.Horizontal : Orientation.Vertical,
@@ -96,6 +114,17 @@ public sealed class ToggleButtonHandler : Avalonia.Controls.Maui.Handlers.ViewHa
             foreground);
         content.HorizontalAlignment = toggle.HorizontalContentAlignment.ToHorizontalAlignment();
         face.Child = content;
+    }
+
+    private static void InheritForeground(Microsoft.Maui.Controls.View view)
+    {
+        // MAUI gives each native label its own default foreground. UWP content
+        // without a local colour inherits the toggle's checked/theme brush.
+        if (view is Microsoft.Maui.Controls.Label { TextColor: null } &&
+            view.Handler?.PlatformView is TextBlock text)
+            text.ClearValue(TextBlock.ForegroundProperty);
+        foreach (var child in ((IVisualTreeElement)view).GetVisualChildren().OfType<Microsoft.Maui.Controls.View>())
+            InheritForeground(child);
     }
 
     private static void MapAppearance(ToggleButtonHandler handler, ToggleButton toggle)

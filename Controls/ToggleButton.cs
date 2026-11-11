@@ -49,6 +49,16 @@ public class ToggleButton : ContentView
     public static readonly BindableProperty FontSizeProperty =
         BindableProperty.Create(nameof(FontSize), typeof(double), typeof(ToggleButton), 14d);
 
+    /// <summary>The icon's size when it differs from the caption; otherwise follows FontSize.</summary>
+    public double IconFontSize
+    {
+        get => (double)GetValue(IconFontSizeProperty);
+        set => SetValue(IconFontSizeProperty, value);
+    }
+    public static readonly BindableProperty IconFontSizeProperty =
+        BindableProperty.Create(nameof(IconFontSize), typeof(double), typeof(ToggleButton), double.NaN);
+    internal double EffectiveIconFontSize => double.IsFinite(IconFontSize) && IconFontSize > 0 ? IconFontSize : FontSize;
+
     public Thickness Padding
     {
         get => (Thickness)GetValue(PaddingProperty);
@@ -104,6 +114,15 @@ public class ToggleButton : ContentView
     }
     public static readonly BindableProperty ForegroundProperty =
         BindableProperty.Create(nameof(Foreground), typeof(SolidColorBrush), typeof(ToggleButton), Brush.DodgerBlue);
+
+    /// <summary>The foreground currently painted by the native face, for custom content bindings.</summary>
+    public Brush? ContentForeground
+    {
+        get => (Brush?)GetValue(ContentForegroundProperty);
+        internal set => SetValue(ContentForegroundProperty,value);
+    }
+    public static readonly BindableProperty ContentForegroundProperty =
+        BindableProperty.Create(nameof(ContentForeground),typeof(Brush),typeof(ToggleButton),null);
 
     public double ImageSpacing
     {
