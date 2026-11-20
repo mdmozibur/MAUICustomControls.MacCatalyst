@@ -25,6 +25,9 @@ public sealed record DialogPresentationOptions
     public Action? OnEscape { get; init; }
 
     public string? AccessibilityLabel { get; init; }
+
+    /// <summary>The card's corner radius.</summary>
+    public double CornerRadius { get; init; } = 8;
 }
 
 /// <summary>
@@ -61,7 +64,7 @@ public sealed class DialogPresentation
             Background = new SolidColorBrush(dark ? Color.FromRgb(0x2B, 0x2B, 0x2B) : Color.FromRgb(0xF9, 0xF9, 0xF9)),
             BorderBrush = new SolidColorBrush(dark ? Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x26, 0, 0, 0)),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = new CornerRadius(options.CornerRadius),
             BoxShadow = BoxShadows.Parse("0 8 32 0 #40000000"),
             ClipToBounds = true,
             HorizontalAlignment = HorizontalAlignment.Center,

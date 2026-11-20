@@ -49,7 +49,11 @@ internal static class BorderedLayoutChrome
         // Corners without a radius stay square (a segmented "4,0,0,4" panel).
         layer.CornerRadius = (nfloat)Math.Max(0, radius);
         layer.MaskedCorners = radius > 0 ? GetRoundedCorners(cornerRadius) : AllCorners;
-        layer.MasksToBounds = false;
+        // A scroll view clips its content to the viewport; only panels draw outside their bounds.
+        if (platformView is not UIScrollView)
+        {
+            layer.MasksToBounds = false;
+        }
 
         var color = (borderBrush as SolidColorBrush)?.Color;
         var borderLayer = layer.Sublayers?.OfType<CAShapeLayer>().FirstOrDefault(sublayer => sublayer.Name == BorderLayerName);
@@ -79,7 +83,7 @@ internal static class BorderedLayoutChrome
         // unpainted until something resized the panel).
         var bounds = element.Width > 0 && element.Height > 0
             ? new CGRect(0, 0, element.Width, element.Height)
-            : platformView.Bounds;
+            : new CGRect(CGPoint.Empty, platformView.Bounds.Size);
         var inner = new CGRect(
             bounds.X + borderThickness.Left,
             bounds.Y + borderThickness.Top,
@@ -87,7 +91,10 @@ internal static class BorderedLayoutChrome
             Math.Max(0, bounds.Height - borderThickness.Top - borderThickness.Bottom));
         var path = UIBezierPath.FromRoundedRect(bounds, (nfloat)Math.Max(0, radius));
         path.AppendPath(UIBezierPath.FromRoundedRect(inner, (nfloat)Math.Max(0, radius - Math.Max(borderThickness.Left, borderThickness.Top))));
-        borderLayer.Frame = bounds;
+        // A scroll view's sublayers move with its content: keep the border over the viewport.
+        borderLayer.Frame = platformView is UIScrollView scrollView
+            ? new CGRect(scrollView.ContentOffset, bounds.Size)
+            : bounds;
         borderLayer.Path = path.CGPath;
         borderLayer.FillColor = color!.ToCGColor();
         borderLayer.ZPosition = 1;
