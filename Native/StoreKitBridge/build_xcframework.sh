@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds StoreKitBridge.xcframework (Mac Catalyst arm64 + x86_64, iOS device arm64): a dynamic
+# Builds StoreKitBridge.xcframework (Mac Catalyst arm64 + x86_64, iOS device arm64, iOS Simulator arm64): a dynamic
 # framework exposing a C API over StoreKit 2. The .NET side calls it through
 # [DllImport("__Internal")] in Platforms/MacCatalyst/StoreKitBridge.cs once the app references the
 # xcframework as a NativeReference. Run with: bash ./build_xcframework.sh
@@ -78,5 +78,27 @@ plutil -replace CFBundleSupportedPlatforms -json '["iPhoneOS"]' "$IOS_DIR/Info.p
 plutil -remove LSMinimumSystemVersion "$IOS_DIR/Info.plist"
 plutil -replace UIDeviceFamily -json '[1,2]' "$IOS_DIR/Info.plist"
 
-xcodebuild -create-xcframework -framework "$UNIVERSAL_DIR" -framework "$IOS_DIR" -output "$OUTPUT_XCFRAMEWORK"
+# iOS Simulator (arm64, Apple-silicon hosts). Same flat bundle, declaring iPhoneSimulator.
+IOS_SIM_SDK_PATH="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+IOS_SIM_DIR="$BUILD_DIR/ios-arm64-simulator/$FRAMEWORK_NAME.framework"
+echo "Building $FRAMEWORK_NAME for arm64 (iOS Simulator)"
+mkdir -p "$IOS_SIM_DIR"
+xcrun --sdk iphonesimulator swiftc \
+  -target "arm64-apple-ios$MIN_CATALYST_VERSION-simulator" \
+  -sdk "$IOS_SIM_SDK_PATH" \
+  -swift-version 5 \
+  -O \
+  -parse-as-library \
+  -module-name "$FRAMEWORK_NAME" \
+  -emit-library \
+  -Xlinker -install_name -Xlinker "@rpath/$FRAMEWORK_NAME.framework/$FRAMEWORK_NAME" \
+  -framework StoreKit \
+  "$ROOT_DIR/StoreKitBridge.swift" \
+  -o "$IOS_SIM_DIR/$FRAMEWORK_NAME"
+cp "$ROOT_DIR/Info.plist" "$IOS_SIM_DIR/Info.plist"
+plutil -replace CFBundleSupportedPlatforms -json '["iPhoneSimulator"]' "$IOS_SIM_DIR/Info.plist"
+plutil -remove LSMinimumSystemVersion "$IOS_SIM_DIR/Info.plist"
+plutil -replace UIDeviceFamily -json '[1,2]' "$IOS_SIM_DIR/Info.plist"
+
+xcodebuild -create-xcframework -framework "$UNIVERSAL_DIR" -framework "$IOS_DIR" -framework "$IOS_SIM_DIR" -output "$OUTPUT_XCFRAMEWORK"
 echo "Built $OUTPUT_XCFRAMEWORK"

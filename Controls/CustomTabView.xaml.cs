@@ -372,6 +372,8 @@ public partial class CustomTabView : Grid
         tabItem.CloseRequested += TabItem_CloseRequested;
         tabItem.DuplicateRequested += TabItem_DuplicateRequested;
         tabItem.MoveRequested += TabItem_MoveRequested;
+        tabItem.MenuRequested += TabItem_MenuRequested;
+        tabItem.TabletMenuMode = TabletMenuMode;
         TabMotion.Track(tabItem);
     }
 
@@ -381,6 +383,7 @@ public partial class CustomTabView : Grid
         tabItem.CloseRequested -= TabItem_CloseRequested;
         tabItem.DuplicateRequested -= TabItem_DuplicateRequested;
         tabItem.MoveRequested -= TabItem_MoveRequested;
+        tabItem.MenuRequested -= TabItem_MenuRequested;
         TabMotion.Untrack(tabItem);
     }
 
@@ -439,6 +442,40 @@ public partial class CustomTabView : Grid
         var maxOffset = Math.Max(0, TabHost.Width - TabScrollView.Width);
         await TabScrollView.ScrollToAsync(Math.Min(maxOffset, TabScrollView.ScrollX + WidthPerScroll), 0, true);
         UpdateVisualStates();
+    }
+
+    /// <summary>A tab's menu, in <see cref="TabletMenuMode"/> (UWP TabListView.MenuRequested).</summary>
+    public event Action<CustomTabView, TabItem>? MenuRequested;
+
+    private bool _tabletMenuMode;
+
+    /// <summary>Tablet layout: the active tab opens <see cref="MenuRequested"/> when tapped (TabItem.TabletMenuMode).</summary>
+    public bool TabletMenuMode
+    {
+        get => _tabletMenuMode;
+        set
+        {
+            _tabletMenuMode = value;
+            foreach (var tab in TabHost.Children.OfType<TabItem>())
+            {
+                tab.TabletMenuMode = value;
+            }
+        }
+    }
+
+    /// <summary>The add (+) button's minimum width (a wider touch target in the tablet layout; 0 = its own).</summary>
+    public double AddButtonMinWidth
+    {
+        get => AddButton.MinimumWidthRequest;
+        set => AddButton.MinimumWidthRequest = value > 0 ? value : -1;
+    }
+
+    private void TabItem_MenuRequested(object? sender, EventArgs e)
+    {
+        if (sender is TabItem tabItem)
+        {
+            MenuRequested?.Invoke(this, tabItem);
+        }
     }
 
     private void AddButton_Click(object? sender, EventArgs e)

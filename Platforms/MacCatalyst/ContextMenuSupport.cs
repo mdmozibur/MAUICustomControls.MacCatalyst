@@ -92,6 +92,12 @@ public static class ContextMenuSupport
     /// </summary>
     public static bool ShowMenu(IMenuFlyout flyout, IView target, CGPoint location)
     {
+#if IOS && !MACCATALYST
+        // The iPad: a touch menu popover (no public API opens a UIMenu at a point there).
+        return target.Handler is IPlatformViewHandler { PlatformView: UIView touchAnchor, MauiContext: { } touchContext } &&
+               touchAnchor.Window is not null &&
+               TouchMenuPresentation.Show(flyout, touchAnchor, location, touchContext);
+#endif
         if (!OperatingSystem.IsMacCatalystVersionAtLeast(16) ||
             target.Handler is not IPlatformViewHandler { PlatformView: UIView anchor, MauiContext: { } mauiContext } ||
             anchor.Window is null)
@@ -233,6 +239,12 @@ public static class ContextMenuSupport
                         action.DiscoverabilityTitle = description;
                     }
 
+                    // UWP KeyboardAcceleratorTextOverride: the trailing text, as the action's subtitle.
+                    if (item is BindableObject textItem && MenuItemAcceleratorText.GetText(textItem) is { Length: > 0 } acceleratorText)
+                    {
+                        action.Subtitle = acceleratorText;
+                    }
+
                     current.Add(action);
                     break;
                 }
@@ -298,7 +310,8 @@ public static class ContextMenuSupport
         }
     }
 
-    private const double MenuIconPointSize = 13;
+    // The Mac's menu icon size; iPad menus are touch sized and show larger icons.
+    private static double MenuIconPointSize => OperatingSystem.IsMacCatalyst() ? 13 : 24;
 
     // Template images are tinted by the menu, so one image per glyph and font serves every menu,
     // state and theme. Drawing them all on each open delayed the first right-click noticeably.

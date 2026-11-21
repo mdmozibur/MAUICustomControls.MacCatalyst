@@ -16,6 +16,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         ["UseSystemFocusVisuals"] = (handler, view) => FocusRing.UpdateSystemControl(handler.PlatformView, view),
         [nameof(ToggleButton.Text)] = MapText,
         [nameof(ToggleButton.FontSize)] = MapFontSize,
+        [nameof(ToggleButton.FontFamily)] = MapFontSize,
         [nameof(ToggleButton.Padding)] = MapPadding,
         [nameof(ToggleButton.HorizontalContentAlignment)] = MapHorizontalContentAlignment,
         [nameof(ToggleButton.BorderThickness)] = MapBorderThickness,
@@ -24,6 +25,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         [nameof(ToggleButton.IconGlyph)] = MapImageSource,
         [nameof(ToggleButton.CustomFontFamily)] = MapImageSource,
         [nameof(ToggleButton.IsChecked)] = MapIsSelected,
+        [nameof(Microsoft.Maui.Controls.ContentView.Content)] = MapViewContent,
         [nameof(ToggleButton.ImageSpacing)] = MapImageSpacing,
         [nameof(ToggleButton.Orientation)] = MapOrientation,
         // VoiceOver: a toggle with its checked state, named by its text or, for an icon-only button,
@@ -133,10 +135,57 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
     // button lays it out by the line box, as UWP measures a FontIcon.
     public override Size GetDesiredSize(double widthConstraint, double heightConstraint)
     {
+        // View content (UWP ToggleButton.Content set to a panel): its own measure plus the padding.
+        if (_contentHost is not null && VirtualView.Content is IView content)
+        {
+            var padding = VirtualView.Padding;
+            var measured = content.Measure(
+                Math.Max(0, widthConstraint - padding.HorizontalThickness),
+                Math.Max(0, heightConstraint - padding.VerticalThickness));
+            var width = VirtualView.WidthRequest >= 0 ? VirtualView.WidthRequest : measured.Width + padding.HorizontalThickness;
+            var height = VirtualView.HeightRequest >= 0 ? VirtualView.HeightRequest : measured.Height + padding.VerticalThickness;
+            return new Size(Math.Min(width, widthConstraint), Math.Min(height, heightConstraint));
+        }
+
         var size = base.GetDesiredSize(
             GlyphImageRenderer.LayoutConstraint(widthConstraint),
             GlyphImageRenderer.LayoutConstraint(heightConstraint));
         return new Size(Math.Min(size.Width, widthConstraint), Math.Min(size.Height, heightConstraint));
+    }
+
+    private MauiViewHost? _contentHost;
+
+    // UWP ToggleButton.Content can be any element (an icon grid with badges). The button keeps drawing
+    // Text and IconGlyph; a view content is hosted over it, inside the padding, as presentation only
+    // (the button takes the taps).
+    public static void MapViewContent(ToggleButtonHandler handler, ToggleButton view)
+    {
+        handler._contentHost?.RemoveFromSuperview();
+        handler._contentHost = null;
+        if (view.Content is not IView content || handler.MauiContext is null)
+        {
+            return;
+        }
+
+        handler._contentHost = new MauiViewHost(content, handler.MauiContext);
+        handler.PlatformView.AddSubview(handler._contentHost);
+        handler.PlatformView.SetNeedsLayout();
+        ((IView)view).InvalidateMeasure();
+    }
+
+    public override void PlatformArrange(Rect rect)
+    {
+        base.PlatformArrange(rect);
+        if (_contentHost is not null && VirtualView is { } view)
+        {
+            var padding = view.Padding;
+            _contentHost.Frame = new CGRect(
+                padding.Left,
+                padding.Top,
+                Math.Max(0, rect.Width - padding.HorizontalThickness),
+                Math.Max(0, rect.Height - padding.VerticalThickness));
+            _contentHost.SetNeedsLayout();
+        }
     }
 
     private void ConfigureButton(UIButton button)
@@ -254,7 +303,9 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
 
         var hasIcon = !string.IsNullOrWhiteSpace(view.IconGlyph);
         var titleFontSize = (nfloat)Math.Max(hasIcon ? Math.Min(view.FontSize * 0.75, 13.0) : view.FontSize, 8d);
-        var titleFont = UIFont.SystemFontOfSize(titleFontSize);
+        var titleFont = !string.IsNullOrWhiteSpace(view.FontFamily)
+            ? ResolvePlatformFont(view.FontFamily, titleFontSize) ?? UIFont.SystemFontOfSize(titleFontSize)
+            : UIFont.SystemFontOfSize(titleFontSize);
 
         var image = CreateImage(view, foregroundColor);
         configuration.Title = view.Text;
@@ -265,6 +316,18 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         configuration.ContentInsets = ResolveContentInsets(view.Padding);
         configuration.CornerStyle = UIButtonConfigurationCornerStyle.Fixed;
         configuration.Background.CornerRadius = 0;
+        // The configuration's title attributes win over the title label's font.
+        configuration.TitleTextAttributesTransformer = attributes =>
+        {
+            var mutable = new NSMutableDictionary<NSString, NSObject>();
+            foreach (var key in attributes.Keys)
+            {
+                mutable[key] = attributes[key];
+            }
+
+            mutable[UIStringAttributeKey.Font] = titleFont;
+            return mutable;
+        };
 
         button.Configuration = configuration;
         button.SetTitle(view.Text, UIControlState.Normal);

@@ -47,7 +47,11 @@ public class LazyLayoutHandler : ViewHandler<ILayout, LayoutView>, ILayoutHandle
             throw new InvalidOperationException("VirtualView must be set to create a LayoutView");
         }
 
+#if IOS && !MACCATALYST
+        return new PassThroughLayoutView { CrossPlatformLayout = VirtualView };
+#else
         return new LayoutView { CrossPlatformLayout = VirtualView };
+#endif
     }
 
     public override void SetVirtualView(IView view)
@@ -507,3 +511,64 @@ public static class DeferredRealization
         order.Add(view);
     }
 }
+
+#if IOS && !MACCATALYST
+/// <summary>
+/// UWP hit testing for content views (UWP UserControls and ContentControls convert to them), as
+/// <see cref="PassThroughLayoutView"/> does for layouts: with no background they let touches through
+/// the areas their content leaves empty. Registered for ContentView on the iPad (MauiProgram); views
+/// with their own handlers (ContentButton, ToggleButton, ...) keep them.
+/// </summary>
+public sealed class PassThroughContentViewHandler : ContentViewHandler
+{
+    protected override Microsoft.Maui.Platform.ContentView CreatePlatformView()
+    {
+        _ = VirtualView ?? throw new InvalidOperationException("VirtualView must be set to create a ContentView");
+        return new PassThroughContentView { CrossPlatformLayout = VirtualView };
+    }
+}
+
+internal sealed class PassThroughContentView : Microsoft.Maui.Platform.ContentView
+{
+    public override UIView? HitTest(CoreGraphics.CGPoint point, UIEvent? uievent)
+    {
+        var hit = base.HitTest(point, uievent);
+        return ReferenceEquals(hit, this) && PassThroughHitTest.PassesThrough(View, this) ? null : hit;
+    }
+}
+
+internal static class PassThroughHitTest
+{
+    /// <summary>True for a view with no background, gesture recognizers or native recognizers.</summary>
+    public static bool PassesThrough(IView? view, UIView platformView)
+    {
+        if (view is not Microsoft.Maui.Controls.View element)
+        {
+            return false;
+        }
+
+        var hasBackground = element.Background is not null and not Microsoft.Maui.Controls.SolidColorBrush { Color: null } ||
+                            element.BackgroundColor is not null;
+        return !hasBackground &&
+               element.GestureRecognizers.Count == 0 &&
+               (platformView.GestureRecognizers is null || platformView.GestureRecognizers.Length == 0);
+    }
+}
+
+/// <summary>
+/// UWP hit testing for a layout: a panel with no Background is not hit-testable in the areas its
+/// children leave empty, so touches reach what lies under it (the tablet layout's full-window overlay
+/// over the drawing canvas). MAUI's LayoutView takes every touch inside its bounds. A layout that has
+/// a background (Transparent included, as in UWP), gesture recognizers or native recognizers (compat
+/// pointer and hover tracking) stays a target. iPad only for now: the Mac app has not been checked
+/// with it.
+/// </summary>
+internal sealed class PassThroughLayoutView : LayoutView
+{
+    public override UIView? HitTest(CoreGraphics.CGPoint point, UIEvent? uievent)
+    {
+        var hit = base.HitTest(point, uievent);
+        return ReferenceEquals(hit, this) && PassThroughHitTest.PassesThrough(View, this) ? null : hit;
+    }
+}
+#endif

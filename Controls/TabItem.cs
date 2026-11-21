@@ -247,8 +247,50 @@ public sealed partial class TabItem : TemplatedView, IAccessibleItem, ITitleBand
 
     private void Root_Tapped(object? sender, TappedEventArgs e)
     {
+        // Tablet layout (UWP TabItem_Tapped): a tap on the tab that is already active opens its menu.
+        if (TabletMenuMode && IsSelected)
+        {
+            MenuRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
         SelectionRequested?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>
+    /// Raised in <see cref="TabletMenuMode"/> when the active tab is tapped: the app shows its tab menu
+    /// (UWP TabItem.MenuRequested).
+    /// </summary>
+    public event EventHandler? MenuRequested;
+
+    private bool _tabletMenuMode;
+
+    /// <summary>
+    /// Tablet layout (UWP TabItem.TabletMenuMode): a tap on the active tab opens the app's tab menu
+    /// (<see cref="MenuRequested"/>) instead of the context menu, and the active tab hides its ✕ (the
+    /// menu has Close).
+    /// </summary>
+    public bool TabletMenuMode
+    {
+        get => _tabletMenuMode;
+        set
+        {
+            if (_tabletMenuMode == value)
+                return;
+            _tabletMenuMode = value;
+            FlyoutBase.SetContextFlyout(this, value ? null : _contextMenu);
+            UpdateVisualState();
+        }
+    }
+
+    /// <summary>True when the tab's file has a path the user may copy (as the context menu offers).</summary>
+    public bool CanCopyFullPath => GetCopyableFilePath() is not null;
+
+    /// <summary>Copies the tab's file path, as the context menu does.</summary>
+    public void CopyFullPath() => CopyPathItem_Clicked(this, EventArgs.Empty);
+
+    /// <summary>Asks the tab list to duplicate this tab, as the context menu does.</summary>
+    public void RequestDuplicate() => DuplicateItem_Clicked(this, EventArgs.Empty);
 
     private void CloseButton_Clicked(object? sender, EventArgs e)
     {
@@ -321,6 +363,11 @@ public sealed partial class TabItem : TemplatedView, IAccessibleItem, ITitleBand
             return;
 
         VisualStateManager.GoToState(_rootGrid, GetVisualStateName());
+        if (_closeButton is not null && TabletMenuMode)
+        {
+            _closeButton.Opacity = IsSelected ? 0 : 1;
+            _closeButton.InputTransparent = IsSelected;
+        }
 
         // UWP ChangeState / History_SavedUnsaved_Changed: the selection bar also tells whether the
         // document is saved.

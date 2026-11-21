@@ -89,6 +89,16 @@ public class ToggleButton : ContentView
     public static readonly BindableProperty IconGlyphProperty =
         BindableProperty.Create(nameof(IconGlyph), typeof(string), typeof(ToggleButton), string.Empty);
 
+    /// <summary>The font of <see cref="Text"/> (UWP Control.FontFamily: an icon font makes the text a glyph).</summary>
+    public string? FontFamily
+    {
+        get => (string?)GetValue(FontFamilyProperty);
+        set => SetValue(FontFamilyProperty, value);
+    }
+
+    public static readonly BindableProperty FontFamilyProperty =
+        BindableProperty.Create(nameof(FontFamily), typeof(string), typeof(ToggleButton), null);
+
     public string? CustomFontFamily
     {
         get => (string?)GetValue(CustomFontFamilyProperty);
