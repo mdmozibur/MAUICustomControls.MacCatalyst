@@ -17,6 +17,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         [nameof(ToggleButton.Text)] = MapText,
         [nameof(ToggleButton.FontSize)] = MapFontSize,
         [nameof(ToggleButton.FontFamily)] = MapFontSize,
+        [nameof(ToggleButton.IconFontSize)] = MapFontSize,
         [nameof(ToggleButton.Padding)] = MapPadding,
         [nameof(ToggleButton.HorizontalContentAlignment)] = MapHorizontalContentAlignment,
         [nameof(ToggleButton.BorderThickness)] = MapBorderThickness,
@@ -302,7 +303,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
         var foregroundColor = ResolveContentColor(view);
 
         var hasIcon = !string.IsNullOrWhiteSpace(view.IconGlyph);
-        var titleFontSize = (nfloat)Math.Max(hasIcon ? Math.Min(view.FontSize * 0.75, 13.0) : view.FontSize, 8d);
+        var titleFontSize = (nfloat)Math.Max(hasIcon && !view.IsSet(ToggleButton.IconFontSizeProperty) ? Math.Min(view.FontSize * 0.75, 13.0) : view.FontSize, 8d);
         var titleFont = !string.IsNullOrWhiteSpace(view.FontFamily)
             ? ResolvePlatformFont(view.FontFamily, titleFontSize) ?? UIFont.SystemFontOfSize(titleFontSize)
             : UIFont.SystemFontOfSize(titleFontSize);
@@ -429,7 +430,7 @@ public sealed class ToggleButtonHandler : ViewHandler<ToggleButton, UIButton>
 
         if (!string.IsNullOrWhiteSpace(view.CustomFontFamily))
         {
-            return CreateFontGlyphImage(view.IconGlyph, view.CustomFontFamily, view.FontSize, tintColor);
+            return CreateFontGlyphImage(view.IconGlyph, view.CustomFontFamily, view.EffectiveIconFontSize, tintColor);
         }
 
         var config = UIImageSymbolConfiguration.Create(UIImageSymbolScale.Medium);
