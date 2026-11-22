@@ -218,6 +218,16 @@ public partial class CustomTabView : Grid
                 break;
         }
 
+        // A closed tab's model must not outlive it here (the view, and with it this map, can be
+        // cached for the whole session).
+        if (args.Action is NotifyCollectionChangedAction.Remove or NotifyCollectionChangedAction.Replace or NotifyCollectionChangedAction.Reset)
+        {
+            foreach (var model in _filePathCopyAvailability.Keys.Where(model => !_items.Contains(model)).ToList())
+            {
+                _filePathCopyAvailability.Remove(model);
+            }
+        }
+
         UpdateVisualStates();
     }
 #pragma warning restore CS8602

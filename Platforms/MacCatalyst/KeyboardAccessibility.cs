@@ -162,10 +162,20 @@ public sealed class AccessibleItemHandler : ContentViewHandler
             }
         }
 
+        // UIKit retains the custom actions, and the GC treats what their callbacks hold as rooted.
+        // A callback holding the item (or an action that captures it) would keep a view removed from
+        // its layout, and everything it is bound to, alive: MAUI does not disconnect such a view's
+        // handler. The callbacks hold the item weakly and look the action up when invoked.
+        var weakItem = new WeakReference<IAccessibleItem>(item);
         view.AccessibilityCustomActions = item.AccessibleActions is { Count: > 0 } actions
-            ? actions.Select(action => new UIAccessibilityCustomAction(action.Name, (Func<UIAccessibilityCustomAction, bool>)(_ =>
+            ? actions.Select((action, index) => new UIAccessibilityCustomAction(action.Name, (Func<UIAccessibilityCustomAction, bool>)(_ =>
             {
-                action.Invoke();
+                if (!weakItem.TryGetTarget(out var target) || target.AccessibleActions is not { } current || index >= current.Count)
+                {
+                    return false;
+                }
+
+                current[index].Invoke();
                 return true;
             }))).ToArray()
             : null;
