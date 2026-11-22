@@ -149,7 +149,7 @@ public class AppMenuBarItem : MenuBarItem, IHideableMenuElement
 
 internal static class MenuVisibility
 {
-    public static BindableProperty CreateProperty(Type owner) =>
+    public static BindableProperty CreateProperty([System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicMethods | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicProperties)] Type owner) =>
         BindableProperty.Create("IsVisible", typeof(bool), owner, true, propertyChanged: OnIsVisibleChanged);
 
     public static bool IsHidden(object? element) => element is IHideableMenuElement { IsVisible: false };
