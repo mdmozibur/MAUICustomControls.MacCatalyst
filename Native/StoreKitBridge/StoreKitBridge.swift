@@ -14,6 +14,42 @@ private enum SKBStatus: Int32 {
     case productNotFound = 3
     case unverified = 4
     case failed = 5
+    // The App Store could not be reached (StoreKitError.networkError).
+    case networkError = 6
+    // This Mac or Apple Account may not buy (Screen Time restrictions, Product.PurchaseError.purchaseNotAllowed).
+    case notAllowed = 7
+    // The product exists but is not sold in the user's storefront.
+    case notAvailableInStorefront = 8
+}
+
+// The status that best describes a thrown StoreKit error; anything unrecognised is .failed.
+private func status(of error: Error) -> SKBStatus {
+    if let storeKitError = error as? StoreKitError {
+        switch storeKitError {
+        case .networkError:
+            return .networkError
+        case .userCancelled:
+            return .userCancelled
+        case .notAvailableInStorefront:
+            return .notAvailableInStorefront
+        default:
+            return .failed
+        }
+    }
+    if let purchaseError = error as? Product.PurchaseError {
+        switch purchaseError {
+        case .productUnavailable:
+            return .productNotFound
+        case .purchaseNotAllowed:
+            return .notAllowed
+        default:
+            return .failed
+        }
+    }
+    if error is URLError {
+        return .networkError
+    }
+    return .failed
 }
 
 private func complete(_ completion: SKBCompletion, _ context: UnsafeMutableRawPointer?, _ status: SKBStatus, _ text: String?) {
@@ -81,7 +117,64 @@ public func skb_purchase(_ productId: UnsafePointer<CChar>, _ context: UnsafeMut
                 complete(completion, context, .failed, "Unknown purchase result.")
             }
         } catch {
-            complete(completion, context, .failed, error.localizedDescription)
+            complete(completion, context, status(of: error), error.localizedDescription)
+        }
+    }
+}
+
+private func unitName(_ unit: Product.SubscriptionPeriod.Unit) -> String {
+    switch unit {
+    case .day: return "day"
+    case .week: return "week"
+    case .month: return "month"
+    case .year: return "year"
+    @unknown default: return "unknown"
+    }
+}
+
+// Whole months in a subscription period (0 for periods shorter than a month).
+private func months(in period: Product.SubscriptionPeriod) -> Int {
+    switch period.unit {
+    case .month: return period.value
+    case .year: return period.value * 12
+    default: return 0
+    }
+}
+
+/// Loads products from the App Store: for each one its localized name and description, the price
+/// as the storefront shows it (displayPrice), as a decimal string and its ISO currency code, and for
+/// a subscription its period and the price per month in the storefront's format. `productIds` is a
+/// JSON array of product identifiers. Products the App Store does not know are left out.
+@_cdecl("skb_products")
+public func skb_products(_ productIds: UnsafePointer<CChar>, _ context: UnsafeMutableRawPointer?, _ completion: SKBCompletion) {
+    let text = String(cString: productIds)
+    let identifiers = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String] ?? []
+    Task {
+        do {
+            var entries: [[String: Any]] = []
+            for product in try await Product.products(for: identifiers) {
+                var entry: [String: Any] = [
+                    "productId": product.id,
+                    "displayName": product.displayName,
+                    "description": product.description,
+                    "displayPrice": product.displayPrice,
+                    "price": NSDecimalNumber(decimal: product.price).stringValue,
+                    "currencyCode": product.priceFormatStyle.currencyCode,
+                    "productType": product.type.rawValue,
+                ]
+                if let period = product.subscription?.subscriptionPeriod {
+                    entry["periodUnit"] = unitName(period.unit)
+                    entry["periodValue"] = period.value
+                    let monthCount = months(in: period)
+                    if monthCount > 0 {
+                        entry["displayPricePerMonth"] = (product.price / Decimal(monthCount)).formatted(product.priceFormatStyle)
+                    }
+                }
+                entries.append(entry)
+            }
+            complete(completion, context, .success, json(entries))
+        } catch {
+            complete(completion, context, status(of: error), error.localizedDescription)
         }
     }
 }
@@ -109,7 +202,7 @@ public func skb_sync(_ context: UnsafeMutableRawPointer?, _ completion: SKBCompl
             try await AppStore.sync()
             complete(completion, context, .success, nil)
         } catch {
-            complete(completion, context, .failed, error.localizedDescription)
+            complete(completion, context, status(of: error), error.localizedDescription)
         }
     }
 }

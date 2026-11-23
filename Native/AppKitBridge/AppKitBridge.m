@@ -113,6 +113,32 @@ void appkit_terminate_now(void)
     });
 }
 
+typedef void (*AKBLaunchCompletion)(void *context, int launched);
+
+// Restart: starts a second instance of the app's own bundle (NSWorkspace with
+// createsNewApplicationInstance; allowed in the App Sandbox, unlike running /usr/bin/open), then
+// reports through `completion` whether it started. The caller quits this instance afterwards.
+__attribute__((visibility("default")))
+void appkit_launch_new_instance(void *context, AKBLaunchCompletion completion)
+{
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSWorkspaceOpenConfiguration *configuration = [NSWorkspaceOpenConfiguration configuration];
+        configuration.createsNewApplicationInstance = YES;
+        configuration.activates = YES;
+        configuration.addsToRecentItems = NO;
+        [[NSWorkspace sharedWorkspace] openApplicationAtURL:NSBundle.mainBundle.bundleURL
+                                              configuration:configuration
+                                          completionHandler:^(NSRunningApplication *application, NSError *error) {
+            if (error != nil)
+            {
+                NSLog(@"AppKitBridge: relaunch failed: %@", error);
+            }
+
+            completion(context, application != nil && error == nil ? 1 : 0);
+        }];
+    });
+}
+
 // The dot in the close button that tells the user a window has unsaved changes.
 __attribute__((visibility("default")))
 void appkit_set_document_edited(int edited)

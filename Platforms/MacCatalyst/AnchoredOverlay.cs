@@ -404,7 +404,12 @@ public sealed class AnchoredOverlay
         }
     }
 
-    /// <summary>Closes the overlay on the first press anywhere outside it, and swallows that press.</summary>
+    /// <summary>
+    /// Closes the overlay on the first press anywhere outside it, and swallows that press. Trackpad
+    /// scrolling and pinching outside it close it too, as WinUI's light dismiss does on a scroll, but
+    /// reach the view below: they carry no touches, so the catcher would otherwise take them without
+    /// closing and the canvas below would ignore every pan and zoom until the next click.
+    /// </summary>
     private sealed class DismissCatcherView : UIView
     {
         private readonly Action _dismiss;
@@ -413,6 +418,18 @@ public sealed class AnchoredOverlay
         {
             _dismiss = dismiss;
             BackgroundColor = UIColor.Clear;
+        }
+
+        public override UIView? HitTest(CGPoint point, UIEvent? uievent)
+        {
+            if (uievent?.Type is UIEventType.Scroll or UIEventType.Transform)
+            {
+                // Not while UIKit is hit-testing: closing changes the view tree.
+                BeginInvokeOnMainThread(_dismiss);
+                return null;
+            }
+
+            return base.HitTest(point, uievent);
         }
 
         public override void TouchesBegan(NSSet touches, UIEvent? evt) => _dismiss();

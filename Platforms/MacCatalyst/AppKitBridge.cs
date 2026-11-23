@@ -308,6 +308,42 @@ public static unsafe class AppKitBridge
         }
     }
 
+    /// <summary>
+    /// Starts a second instance of the app's bundle (NSWorkspace, which the App Sandbox allows) and
+    /// completes with whether it started; quit this instance afterwards to restart. False when the
+    /// plug-in is missing.
+    /// </summary>
+    public static Task<bool> LaunchNewInstanceAsync()
+    {
+        if (!TryGetExport("appkit_launch_new_instance", out var launch))
+        {
+            return Task.FromResult(false);
+        }
+
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handle = GCHandle.Alloc(completion);
+        try
+        {
+            ((delegate* unmanaged<IntPtr, delegate* unmanaged<IntPtr, int, void>, void>)launch)(GCHandle.ToIntPtr(handle), &OnLaunched);
+        }
+        catch
+        {
+            handle.Free();
+            throw;
+        }
+
+        return completion.Task;
+    }
+
+    [UnmanagedCallersOnly]
+    private static void OnLaunched(IntPtr context, int launched)
+    {
+        var handle = GCHandle.FromIntPtr(context);
+        var completion = (TaskCompletionSource<bool>)handle.Target!;
+        handle.Free();
+        completion.TrySetResult(launched != 0);
+    }
+
     /// <summary>Shows or clears the unsaved-changes dot in the window's close button.</summary>
     public static void SetDocumentEdited(bool edited)
     {
