@@ -84,11 +84,11 @@ public sealed class SemanticZoom : ContentView
     {
         Content = _container;
 
-#if !LINUX
-        var doubleTap = new TapGestureRecognizer { NumberOfTapsRequired = 2 };
-        doubleTap.Tapped += (_, _) => ToggleActiveView();
-        GestureRecognizers.Add(doubleTap);
-#endif
+        // UWP zooms out when a group header of the zoomed-in view is clicked, and back in when a
+        // group of the zoomed-out view is picked. The platform handlers wire the header click
+        // (Mac Catalyst: SemanticZoomHandler; Linux: WireZoomedInHeaders). No double-tap over the
+        // whole control: such a recognizer held back every click on the lists inside it (on Mac
+        // Catalyst a GridView item could be clicked once and then never selected again).
     }
 
     public void ToggleActiveView()

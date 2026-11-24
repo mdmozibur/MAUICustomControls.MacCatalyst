@@ -29,6 +29,13 @@ public sealed class SemanticZoomHandler : ContentViewHandler
         [nameof(SemanticZoom.IsZoomedInViewHeaderSticky)] = MapIsZoomedInViewHeaderSticky
     };
 
+    // UWP zooms out when a group header of the zoomed-in list is clicked. The click is a native
+    // single-tap recognizer on that list which only takes clicks on a header and never delays or
+    // cancels the list's own clicks, so selecting items works as before.
+    private UICollectionView? _headerClickList;
+    private UITapGestureRecognizer? _headerClick;
+    private CollectionView? _waitingList;
+
     public SemanticZoomHandler() : base(PropertyMapper)
     {
     }
@@ -41,6 +48,8 @@ public sealed class SemanticZoomHandler : ContentViewHandler
         {
             semanticZoom.PlatformAnimateTransition = AnimateTransition;
             UpdateZoomedInViewHeaderStickiness(semanticZoom);
+            AttachHeaderClick(semanticZoom);
+            semanticZoom.Dispatcher.Dispatch(() => AttachHeaderClick(semanticZoom));
         }
     }
 
@@ -51,6 +60,7 @@ public sealed class SemanticZoomHandler : ContentViewHandler
             semanticZoom.PlatformAnimateTransition = null;
         }
 
+        DetachHeaderClick();
         base.DisconnectHandler(platformView);
     }
 
@@ -74,6 +84,96 @@ public sealed class SemanticZoomHandler : ContentViewHandler
 
         layout.SectionHeadersPinToVisibleBounds = semanticZoom.IsZoomedInViewHeaderSticky;
         layout.InvalidateLayout();
+    }
+
+    private void AttachHeaderClick(SemanticZoom semanticZoom)
+    {
+        var list = FindCollectionView(semanticZoom.ZoomedInView);
+        if (list is null)
+            return;
+
+        if (FindNativeList(list.Handler?.PlatformView as UIView) is not { } nativeList)
+        {
+            // The list gets its native view later: wire the click once it has one.
+            if (!ReferenceEquals(_waitingList, list))
+            {
+                StopWaiting();
+                _waitingList = list;
+                list.HandlerChanged += OnZoomedInListHandlerChanged;
+            }
+            return;
+        }
+
+        StopWaiting();
+        if (ReferenceEquals(nativeList, _headerClickList))
+            return;
+
+        DetachHeaderClick();
+        var click = new UITapGestureRecognizer(recognizer =>
+        {
+            if (recognizer.State == UIGestureRecognizerState.Recognized && VirtualView is SemanticZoom zoom)
+                zoom.IsZoomedInViewActive = false;
+        })
+        {
+            CancelsTouchesInView = false,
+            DelaysTouchesBegan = false,
+            DelaysTouchesEnded = false,
+        };
+        click.ShouldReceiveTouch = (_, touch) => IsOnGroupHeader(nativeList, touch.LocationInView(nativeList));
+        nativeList.AddGestureRecognizer(click);
+        _headerClickList = nativeList;
+        _headerClick = click;
+    }
+
+    private void OnZoomedInListHandlerChanged(object? sender, EventArgs e)
+    {
+        if (VirtualView is SemanticZoom semanticZoom)
+            semanticZoom.Dispatcher.Dispatch(() => AttachHeaderClick(semanticZoom));
+    }
+
+    private void StopWaiting()
+    {
+        if (_waitingList is { } list)
+            list.HandlerChanged -= OnZoomedInListHandlerChanged;
+        _waitingList = null;
+    }
+
+    private void DetachHeaderClick()
+    {
+        StopWaiting();
+        if (_headerClickList is { } list && _headerClick is { } click)
+            list.RemoveGestureRecognizer(click);
+        _headerClickList = null;
+        _headerClick = null;
+    }
+
+    private static bool IsOnGroupHeader(UICollectionView list, CGPoint point)
+    {
+        foreach (var header in list.GetVisibleSupplementaryViews(UICollectionElementKindSectionKey.Header))
+        {
+            if (header.Frame.Contains(point))
+                return true;
+        }
+
+        return false;
+    }
+
+    // MAUI's CollectionView handler hosts the UICollectionView inside a container view.
+    private static UICollectionView? FindNativeList(UIView? view)
+    {
+        if (view is null)
+            return null;
+
+        if (view is UICollectionView list)
+            return list;
+
+        foreach (var child in view.Subviews)
+        {
+            if (FindNativeList(child) is { } found)
+                return found;
+        }
+
+        return null;
     }
 
     private static CollectionView? FindCollectionView(Element? root)
