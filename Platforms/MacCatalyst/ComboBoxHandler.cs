@@ -254,7 +254,9 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, ComboBoxView>
         // bindings working.
         mauiView.Parent = VirtualView;
 
-        return new MauiViewHost(mauiView, MauiContext);
+        // UWP centres a ComboBox's content vertically (VerticalContentAlignment="Center"), so a
+        // templated selection stays centred when the field is taller than its text.
+        return new MauiViewHost(mauiView, MauiContext) { CenterVertically = true };
     }
 
     private void UpdateAccessibility()

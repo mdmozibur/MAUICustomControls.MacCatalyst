@@ -541,6 +541,7 @@
                             Text="&#x2715;"
                             FontSize="14"
                             Padding="4,4,4,4"
+                            CornerRadius="0"
                             BackgroundColor="Transparent"
                             BorderWidth="0"
                             MinimumWidthRequest="24"

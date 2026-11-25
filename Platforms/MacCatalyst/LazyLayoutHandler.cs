@@ -47,7 +47,7 @@ public class LazyLayoutHandler : ViewHandler<ILayout, LayoutView>, ILayoutHandle
             throw new InvalidOperationException("VirtualView must be set to create a LayoutView");
         }
 
-#if IOS && !MACCATALYST
+#if IOS || MACCATALYST
         return new PassThroughLayoutView { CrossPlatformLayout = VirtualView };
 #else
         return new LayoutView { CrossPlatformLayout = VirtualView };
@@ -512,11 +512,11 @@ public static class DeferredRealization
     }
 }
 
-#if IOS && !MACCATALYST
+#if IOS || MACCATALYST
 /// <summary>
 /// UWP hit testing for content views (UWP UserControls and ContentControls convert to them), as
 /// <see cref="PassThroughLayoutView"/> does for layouts: with no background they let touches through
-/// the areas their content leaves empty. Registered for ContentView on the iPad (MauiProgram); views
+/// the areas their content leaves empty. Registered for ContentView on the Mac and the iPad (MauiProgram); views
 /// with their own handlers (ContentButton, ToggleButton, ...) keep them.
 /// </summary>
 public sealed class PassThroughContentViewHandler : ContentViewHandler
@@ -560,8 +560,8 @@ internal static class PassThroughHitTest
 /// children leave empty, so touches reach what lies under it (the tablet layout's full-window overlay
 /// over the drawing canvas). MAUI's LayoutView takes every touch inside its bounds. A layout that has
 /// a background (Transparent included, as in UWP), gesture recognizers or native recognizers (compat
-/// pointer and hover tracking) stays a target. iPad only for now: the Mac app has not been checked
-/// with it.
+/// pointer and hover tracking) stays a target. On the Mac and the iPad (owner decision 2026-11-25: the
+/// status one-liner laid over the Mac command input swallowed every click on it).
 /// </summary>
 internal sealed class PassThroughLayoutView : LayoutView
 {

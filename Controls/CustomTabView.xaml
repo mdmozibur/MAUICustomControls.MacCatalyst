@@ -115,6 +115,7 @@
         <Button
             x:Name="AddButton"
             Grid.Column="3"
+            CornerRadius="0"
             Text="&#xFF0B;"
             FontSize="12"
             Padding="{Binding Source={x:Reference TabViewChromeRoot}, Path=ButtonsPadding}"
