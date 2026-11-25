@@ -138,8 +138,8 @@ internal sealed class DropdownTransitioningDelegate : UIViewControllerTransition
 internal sealed class DropdownAnimator : UIViewControllerAnimatedTransitioning
 {
     private const float CollapsedScale = 0.94f;
-    private const double PresentDuration = 0.11;
-    private const double DismissDuration = 0.22;
+    private const double PresentDuration = 0.12;
+    private const double DismissDuration = 0.12;
 
     private readonly bool _presenting;
 

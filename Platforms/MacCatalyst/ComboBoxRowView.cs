@@ -3,33 +3,63 @@ using UIKit;
 
 namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst;
 
-/// <summary>One row of the drop-down, wrapping the caller's templated view.</summary>
-internal sealed class ComboBoxRowView : UIControl
+/// <summary>
+/// One row of the drop-down: a recycled table cell wrapping the item's view (its template, or its
+/// text), which is created once per cell and rebound as the cell is reused for other items.
+/// </summary>
+internal sealed class ComboBoxRowView : UITableViewCell
 {
-    private const double HorizontalPadding = 12;
-    private const double VerticalPadding = 6;
+    public const double HorizontalPadding = 12;
+    public const double VerticalPadding = 6;
 
-    private readonly UIView _content;
-    private readonly bool _isSelected;
-    private readonly Action _onActivated;
-    private readonly Action _onHovered;
-    private double _width;
-
+    private readonly Action<ComboBoxRowView, bool> _onHovered;
+    private UIView? _content;
+    private bool _isSelectedItem;
     private bool _isHighlighted;
 
-    public ComboBoxRowView(UIView content, bool isSelected, double width, Action onActivated, Action onHovered)
+    public ComboBoxRowView(string reuseIdentifier, Action<ComboBoxRowView, bool> onHovered)
+        : base(UITableViewCellStyle.Default, reuseIdentifier)
     {
-        _content = content;
-        _isSelected = isSelected;
-        _onActivated = onActivated;
         _onHovered = onHovered;
-        _width = width;
 
-        AddSubview(content);
-        UpdateBackground();
+        // The row draws its own selection and highlight, in the accent colour as WinUI does; the
+        // table's own selection look stays off.
+        SelectionStyle = UITableViewCellSelectionStyle.None;
+        BackgroundColor = UIColor.Clear;
+        AccessibilityTraits = UIAccessibilityTrait.Button;
 
-        TouchUpInside += (_, _) => _onActivated();
         AddGestureRecognizer(new UIHoverGestureRecognizer(OnHover));
+    }
+
+    /// <summary>The item index this cell currently shows.</summary>
+    public int Index { get; set; } = -1;
+
+    /// <summary>The item's view; set once, when the cell is first created.</summary>
+    public UIView? ItemView
+    {
+        get => _content;
+        set
+        {
+            _content?.RemoveFromSuperview();
+            _content = value;
+            if (value is not null)
+                ContentView.AddSubview(value);
+            SetNeedsLayout();
+        }
+    }
+
+    /// <summary>Whether this row is the box's selected item.</summary>
+    public bool IsSelectedItem
+    {
+        get => _isSelectedItem;
+        set
+        {
+            _isSelectedItem = value;
+            UpdateBackground();
+            AccessibilityTraits = value
+                ? UIAccessibilityTrait.Button | UIAccessibilityTrait.Selected
+                : UIAccessibilityTrait.Button;
+        }
     }
 
     /// <summary>Set by keyboard navigation and by hover; distinct from being the selected item.</summary>
@@ -43,48 +73,15 @@ internal sealed class ComboBoxRowView : UIControl
         }
     }
 
-    /// <summary>Width the row reports when Auto Layout asks without offering one.</summary>
-    public double PreferredWidth
-    {
-        get => _width;
-        set
-        {
-            _width = value;
-            InvalidateIntrinsicContentSize();
-        }
-    }
-
-    /// <summary>Width the row needs to show its content without wrapping or truncating it.</summary>
-    public double NaturalWidth
-    {
-        get
-        {
-            var content = _content is MauiViewHost host
-                ? host.NaturalWidth
-                : (double)_content.SizeThatFits(new CGSize(nfloat.MaxValue, nfloat.MaxValue)).Width;
-            return Math.Ceiling(content) + (HorizontalPadding * 2);
-        }
-    }
-
-    public override CGSize SizeThatFits(CGSize size)
-    {
-        var width = size.Width > 0 && !double.IsInfinity(size.Width) ? (double)size.Width : _width;
-        var available = width - (HorizontalPadding * 2);
-
-        if (_content is MauiViewHost host)
-            host.LayoutWidth = available;
-
-        var contentSize = _content.SizeThatFits(new CGSize(available, double.PositiveInfinity));
-        return new CGSize(width, contentSize.Height + (VerticalPadding * 2));
-    }
-
-    public override CGSize IntrinsicContentSize => SizeThatFits(new CGSize(_width, NoIntrinsicMetric));
-
     public override void LayoutSubviews()
     {
         base.LayoutSubviews();
 
-        var contentWidth = Math.Max(0, (double)Bounds.Width - (HorizontalPadding * 2));
+        if (_content is null)
+            return;
+
+        var bounds = ContentView.Bounds;
+        var contentWidth = Math.Max(0, (double)bounds.Width - (HorizontalPadding * 2));
 
         if (_content is MauiViewHost host)
             host.LayoutWidth = contentWidth;
@@ -93,22 +90,17 @@ internal sealed class ComboBoxRowView : UIControl
             HorizontalPadding,
             VerticalPadding,
             contentWidth,
-            Math.Max(0, (double)Bounds.Height - (VerticalPadding * 2)));
+            Math.Max(0, (double)bounds.Height - (VerticalPadding * 2)));
+        _content.SetNeedsLayout();
     }
 
-    private void OnHover(UIHoverGestureRecognizer recognizer)
-    {
-        if (recognizer.State is UIGestureRecognizerState.Began or UIGestureRecognizerState.Changed)
-            _onHovered();
-        else
-            IsHighlighted = false;
-    }
+    private void OnHover(UIHoverGestureRecognizer recognizer) =>
+        _onHovered(this, recognizer.State is UIGestureRecognizerState.Began or UIGestureRecognizerState.Changed);
 
-    // Highlight and selection take the tint: the system accent, as WinUI's list selection does.
     private void UpdateBackground() =>
-        BackgroundColor = _isHighlighted
+        ContentView.BackgroundColor = _isHighlighted
             ? TintColor.ColorWithAlpha(0.18f)
-            : _isSelected
+            : _isSelectedItem
                 ? TintColor.ColorWithAlpha(0.10f)
                 : UIColor.Clear;
 
@@ -117,4 +109,10 @@ internal sealed class ComboBoxRowView : UIControl
         base.TintColorDidChange();
         UpdateBackground();
     }
+
+    /// <summary>The height a row needs around an item view of the given height.</summary>
+    public static double RowHeight(double contentHeight) => Math.Ceiling(contentHeight) + (VerticalPadding * 2);
+
+    /// <summary>The width a row needs around an item view of the given width.</summary>
+    public static double RowWidth(double contentWidth) => Math.Ceiling(contentWidth) + (HorizontalPadding * 2);
 }

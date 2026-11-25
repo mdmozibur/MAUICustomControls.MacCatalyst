@@ -5,37 +5,58 @@ using UIKit;
 
 namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst;
 
+/// <summary>Makes and rebinds the views that show the drop-down's items.</summary>
+internal interface IComboBoxRowFactory
+{
+    /// <summary>Items with the same key can share a view (same template, or both text rows).</summary>
+    string ReuseKey(object item);
+
+    /// <summary>A new view of the item's kind, already showing the item.</summary>
+    UIView Create(object item);
+
+    /// <summary>Points a view made for this item's kind at the item.</summary>
+    void Bind(UIView view, object item);
+}
+
 /// <summary>
-/// The drop-down list, presented as a popover anchored to the field.
+/// The drop-down list, presented under the field (see <see cref="DropdownPresentationController"/>).
 /// </summary>
 /// <remarks>
-/// A popover is used deliberately: it anchors to the source view, floats above all
-/// other content, is never clipped by an ancestor, and dismisses on an outside click —
-/// all of which would otherwise have to be hand-built. On Mac Catalyst it also renders
-/// as a genuine Mac popover.
+/// Rows are recycled table cells: only the rows on screen get an item view, and a cell scrolled
+/// away is rebound to the next item rather than rebuilt. Building every row up front cost a MAUI
+/// view, its handler and a layout pass per item, which made a box with thousands of entries (the
+/// layers of a large drawing) visibly slow to open.
 ///
-/// Rows live in a stack view rather than a UICollectionView: there is no view recycling,
-/// which keeps templated-view lifetime simple, at the cost of building every row up front.
-/// Fine into the hundreds of items; swap in a UICollectionView beyond that.
+/// Row heights are measured lazily, per row, with one off-screen view per kind of row. The list's
+/// width grows past a narrow field to its widest row, as WinUI's does; like WinUI, which sizes the
+/// popup by the rows it has realized, a long list measures a bounded sample (the first rows and
+/// those around the selection) rather than every item.
 /// </remarks>
-internal sealed class ComboBoxDropdownViewController : UIViewController
+internal sealed class ComboBoxDropdownViewController : UIViewController, IUITableViewDataSource, IUITableViewDelegate
 {
+    /// <summary>Rows measured for the list's width: all of a short list, a sample of a long one.</summary>
+    private const int WidthSampleSize = 150;
+
+    /// <summary>Rows either side of the selection included in that sample.</summary>
+    private const int WidthSampleAroundSelection = 20;
+
     private readonly IReadOnlyList<object> _items;
-    private readonly Func<object, UIView> _rowFactory;
+    private readonly IComboBoxRowFactory _rows;
     private readonly Action<int> _onSelect;
     private readonly Action _onCancel;
     private readonly double _maxWidth;
     private readonly double _maxHeight;
+    private readonly double[] _rowHeights;
+    private readonly Dictionary<string, UIView> _measurers = [];
     private double _width;
-    private readonly List<ComboBoxRowView> _rows = [];
 
-    private UIScrollView _scrollView = null!;
-    private UIStackView _stack = null!;
+    private UITableView _table = null!;
     private int _highlightedIndex;
+    private bool _scrolledToSelection;
 
     public ComboBoxDropdownViewController(
         IReadOnlyList<object> items,
-        Func<object, UIView> rowFactory,
+        IComboBoxRowFactory rows,
         int selectedIndex,
         double width,
         double maxWidth,
@@ -44,68 +65,52 @@ internal sealed class ComboBoxDropdownViewController : UIViewController
         Action onCancel)
     {
         _items = items;
-        _rowFactory = rowFactory;
+        _rows = rows;
         _onSelect = onSelect;
         _onCancel = onCancel;
         _width = width;
         _maxWidth = Math.Max(width, maxWidth);
         _maxHeight = maxHeight;
         _highlightedIndex = selectedIndex;
+        _rowHeights = new double[items.Count];
+        Array.Fill(_rowHeights, double.NaN);
         SelectedIndex = selectedIndex;
     }
 
     public int SelectedIndex { get; }
 
+    private double ContentWidth => Math.Max(0, _width - (ComboBoxRowView.HorizontalPadding * 2));
+
     public override void ViewDidLoad()
     {
         base.ViewDidLoad();
 
-        _stack = new UIStackView
-        {
-            Axis = UILayoutConstraintAxis.Vertical,
-            Alignment = UIStackViewAlignment.Fill,
-            Distribution = UIStackViewDistribution.EqualSpacing,
-            TranslatesAutoresizingMaskIntoConstraints = false
-        };
-
-        for (var i = 0; i < _items.Count; i++)
-        {
-            var index = i;
-            var row = new ComboBoxRowView(
-                _rowFactory(_items[i]),
-                isSelected: i == SelectedIndex,
-                width: _width,
-                onActivated: () => _onSelect(index),
-                onHovered: () => Highlight(index, scrollIntoView: false));
-
-            _rows.Add(row);
-            _stack.AddArrangedSubview(row);
-
-            if (i < _items.Count - 1)
-                _stack.AddArrangedSubview(CreateSeparator());
-        }
-
         // The list is as wide as its field, and grows - up to the cap - until its widest row fits,
         // as a WinUI drop-down does. A narrow field would otherwise cut its own entries short.
-        if (_rows.Count > 0)
-        {
-            _width = Math.Min(_maxWidth, Math.Max(_width, _rows.Max(static row => row.NaturalWidth)));
-            foreach (var row in _rows)
-                row.PreferredWidth = _width;
-        }
+        if (_items.Count > 0)
+            _width = Math.Min(_maxWidth, Math.Max(_width, MeasureWidestRow()));
 
-        _scrollView = new UIScrollView
+        _table = new UITableView(CGRect.Empty, UITableViewStyle.Plain)
         {
             TranslatesAutoresizingMaskIntoConstraints = false,
             BackgroundColor = UIColor.SecondarySystemBackground,
-            ClipsToBounds = true
+            ClipsToBounds = true,
+            SeparatorStyle = UITableViewCellSeparatorStyle.SingleLine,
+            SeparatorColor = UIColor.Separator,
+            SeparatorInset = UIEdgeInsets.Zero,
+            // No filler separators under the last row of a short list.
+            TableFooterView = new UIView(CGRect.Empty),
+            CellLayoutMarginsFollowReadableWidth = false,
+            EstimatedRowHeight = (nfloat)EstimatedRowHeight(),
+            SectionHeaderTopPadding = 0,
+            DataSource = this,
+            Delegate = this,
         };
-        _scrollView.Layer.CornerRadius = 10;
-        _scrollView.Layer.BorderWidth = 1;
-        _scrollView.Layer.BorderColor = UIColor.Separator.CGColor;
-        _scrollView.AddSubview(_stack);
+        _table.Layer.CornerRadius = 10;
+        _table.Layer.BorderWidth = 1;
+        _table.Layer.BorderColor = UIColor.Separator.CGColor;
 
-        // Shadow lives on the unclipped root; the scroll view does the corner clipping.
+        // Shadow lives on the unclipped root; the table does the corner clipping.
         View!.BackgroundColor = UIColor.Clear;
         View.ClipsToBounds = false;
         View.Layer.ShadowColor = UIColor.Black.CGColor;
@@ -113,23 +118,29 @@ internal sealed class ComboBoxDropdownViewController : UIViewController
         View.Layer.ShadowRadius = 8;
         View.Layer.ShadowOffset = new CGSize(0, 4);
 
-        View.AddSubview(_scrollView);
+        View.AddSubview(_table);
 
         NSLayoutConstraint.ActivateConstraints([
-            _scrollView.TopAnchor.ConstraintEqualTo(View!.TopAnchor),
-            _scrollView.BottomAnchor.ConstraintEqualTo(View.BottomAnchor),
-            _scrollView.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor),
-            _scrollView.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor),
-
-            _stack.TopAnchor.ConstraintEqualTo(_scrollView.ContentLayoutGuide.TopAnchor),
-            _stack.BottomAnchor.ConstraintEqualTo(_scrollView.ContentLayoutGuide.BottomAnchor),
-            _stack.LeadingAnchor.ConstraintEqualTo(_scrollView.ContentLayoutGuide.LeadingAnchor),
-            _stack.TrailingAnchor.ConstraintEqualTo(_scrollView.ContentLayoutGuide.TrailingAnchor),
-            _stack.WidthAnchor.ConstraintEqualTo(_scrollView.FrameLayoutGuide.WidthAnchor)
+            _table.TopAnchor.ConstraintEqualTo(View.TopAnchor),
+            _table.BottomAnchor.ConstraintEqualTo(View.BottomAnchor),
+            _table.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor),
+            _table.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor)
         ]);
 
         PreferredContentSize = CalculateContentSize();
-        Highlight(_highlightedIndex, scrollIntoView: true);
+    }
+
+    public override void ViewDidLayoutSubviews()
+    {
+        base.ViewDidLayoutSubviews();
+
+        // Once the table has its final frame: bring the selection into view, centred, as WinUI does.
+        if (_scrolledToSelection || _table.Bounds.Height <= 0)
+            return;
+
+        _scrolledToSelection = true;
+        if (_highlightedIndex >= 0 && _highlightedIndex < _items.Count)
+            _table.ScrollToRow(NSIndexPath.FromRowSection(_highlightedIndex, 0), UITableViewScrollPosition.Middle, animated: false);
     }
 
     /// <summary>Mac users expect the keyboard to drive a drop-down.</summary>
@@ -165,34 +176,158 @@ internal sealed class ComboBoxDropdownViewController : UIViewController
     [Export("dismissDropdown:")]
     public void DismissDropdown(UIKeyCommand command) => _onCancel();
 
+    // ---- Table data source and delegate ----
+
+    public nint RowsInSection(UITableView tableView, nint section) => _items.Count;
+
+    public UITableViewCell GetCell(UITableView tableView, NSIndexPath indexPath)
+    {
+        var index = indexPath.Row;
+        var item = _items[index];
+        var key = _rows.ReuseKey(item);
+
+        if (tableView.DequeueReusableCell(key) is ComboBoxRowView cell && cell.ItemView is { } view)
+        {
+            _rows.Bind(view, item);
+        }
+        else
+        {
+            cell = new ComboBoxRowView(key, OnRowHovered) { ItemView = _rows.Create(item) };
+        }
+
+        cell.Index = index;
+        cell.IsSelectedItem = index == SelectedIndex;
+        cell.IsHighlighted = index == _highlightedIndex;
+        cell.SetNeedsLayout();
+        return cell;
+    }
+
+    [Export("tableView:heightForRowAtIndexPath:")]
+    public nfloat GetHeightForRow(UITableView tableView, NSIndexPath indexPath) => (nfloat)RowHeight(indexPath.Row);
+
+    [Export("tableView:didSelectRowAtIndexPath:")]
+    public void RowSelected(UITableView tableView, NSIndexPath indexPath)
+    {
+        tableView.DeselectRow(indexPath, animated: false);
+        _onSelect(indexPath.Row);
+    }
+
+    // ---- Measuring ----
+
+    /// <summary>An off-screen view of the item's kind, pointed at the item, for measuring.</summary>
+    private UIView Measurer(object item)
+    {
+        var key = _rows.ReuseKey(item);
+        if (_measurers.TryGetValue(key, out var measurer))
+        {
+            _rows.Bind(measurer, item);
+            return measurer;
+        }
+
+        measurer = _rows.Create(item);
+        _measurers[key] = measurer;
+        return measurer;
+    }
+
+    private double RowHeight(int index)
+    {
+        if (index < 0 || index >= _rowHeights.Length)
+            return 0;
+
+        if (!double.IsNaN(_rowHeights[index]))
+            return _rowHeights[index];
+
+        var measurer = Measurer(_items[index]);
+        var width = ContentWidth;
+        if (measurer is MauiViewHost host)
+            host.LayoutWidth = width;
+
+        var height = ComboBoxRowView.RowHeight(
+            (double)measurer.SizeThatFits(new CGSize(width, double.PositiveInfinity)).Height);
+        _rowHeights[index] = height;
+        return height;
+    }
+
+    private double NaturalRowWidth(int index)
+    {
+        var measurer = Measurer(_items[index]);
+        var width = measurer is MauiViewHost host
+            ? host.NaturalWidth
+            : (double)measurer.SizeThatFits(new CGSize(nfloat.MaxValue, nfloat.MaxValue)).Width;
+        return ComboBoxRowView.RowWidth(width);
+    }
+
+    private double MeasureWidestRow()
+    {
+        var widest = 0d;
+        foreach (var index in WidthSample())
+            widest = Math.Max(widest, NaturalRowWidth(index));
+        return widest;
+    }
+
+    /// <summary>Every row of a short list; the first rows and those around the selection of a long one.</summary>
+    private IEnumerable<int> WidthSample()
+    {
+        var count = _items.Count;
+        if (count <= WidthSampleSize)
+        {
+            for (var i = 0; i < count; i++)
+                yield return i;
+            yield break;
+        }
+
+        var head = WidthSampleSize - (WidthSampleAroundSelection * 2) - 1;
+        for (var i = 0; i < head; i++)
+            yield return i;
+
+        if (SelectedIndex < 0)
+            yield break;
+
+        var from = Math.Max(head, SelectedIndex - WidthSampleAroundSelection);
+        var to = Math.Min(count - 1, SelectedIndex + WidthSampleAroundSelection);
+        for (var i = from; i <= to; i++)
+            yield return i;
+    }
+
+    private double EstimatedRowHeight() =>
+        _items.Count == 0 ? 28 : RowHeight(SelectedIndex >= 0 && SelectedIndex < _items.Count ? SelectedIndex : 0);
+
+    /// <summary>The list's size: rows are measured only until the height cap is reached.</summary>
     private CGSize CalculateContentSize()
     {
+        var separator = 1d / (double)UIScreen.MainScreen.Scale;
         var height = 0d;
 
-        foreach (var view in _stack.ArrangedSubviews)
-            height += view.SizeThatFits(new CGSize(_width, double.PositiveInfinity)).Height;
+        for (var i = 0; i < _items.Count && height < _maxHeight; i++)
+            height += RowHeight(i) + (i < _items.Count - 1 ? separator : 0);
 
         return new CGSize(_width, Math.Min(height, _maxHeight));
     }
 
+    // ---- Highlight ----
+
+    private void OnRowHovered(ComboBoxRowView row, bool hovering)
+    {
+        if (hovering)
+            Highlight(row.Index, scrollIntoView: false);
+        else
+            row.IsHighlighted = false;
+    }
+
     private void Highlight(int index, bool scrollIntoView)
     {
-        if (index < 0 || index >= _rows.Count)
+        if (index < 0 || index >= _items.Count)
             return;
-
-        for (var i = 0; i < _rows.Count; i++)
-            _rows[i].IsHighlighted = i == index;
 
         _highlightedIndex = index;
 
-        if (scrollIntoView)
-            _scrollView.ScrollRectToVisible(_rows[index].Frame, animated: false);
-    }
+        foreach (var cell in _table.VisibleCells)
+        {
+            if (cell is ComboBoxRowView row)
+                row.IsHighlighted = row.Index == index;
+        }
 
-    private static UIView CreateSeparator()
-    {
-        var separator = new UIView { BackgroundColor = UIColor.Separator };
-        separator.HeightAnchor.ConstraintEqualTo(1f / UIScreen.MainScreen.Scale).Active = true;
-        return separator;
+        if (scrollIntoView)
+            _table.ScrollToRow(NSIndexPath.FromRowSection(index, 0), UITableViewScrollPosition.None, animated: false);
     }
 }

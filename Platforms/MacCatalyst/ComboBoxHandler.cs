@@ -169,7 +169,7 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, ComboBoxView>
     /// <summary>The view for one item, in a row or in the field: its template, or its text.</summary>
     private UIView CreateItemView(ComboBox view, DataTemplate? template, object item)
     {
-        if (template?.CreateContent() is View templated)
+        if ((template is null ? null : Select(template, item, view)?.CreateContent()) is View templated)
         {
             templated.BindingContext = item;
             return Host(templated);
@@ -198,24 +198,41 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, ComboBoxView>
         if (view.IsSet(ComboBox.FontSizeProperty))
             label.FontSize = view.FontSize;
 
-        if (string.IsNullOrWhiteSpace(view.DisplayMemberPath))
+        if (!string.IsNullOrWhiteSpace(view.DisplayMemberPath))
         {
-            label.Text = ComboBox.ItemText(item);
-        }
-        else
-        {
-            label.BindingContext = item;
             label.SetBinding(global::Microsoft.Maui.Controls.Label.TextProperty,
                 new global::Microsoft.Maui.Controls.Binding(view.DisplayMemberPath));
         }
 
+        BindTextLabel(view, label, item);
         return label;
+    }
+
+    /// <summary>Points a text row's label at another item.</summary>
+    private static void BindTextLabel(ComboBox view, global::Microsoft.Maui.Controls.Label label, object item)
+    {
+        if (string.IsNullOrWhiteSpace(view.DisplayMemberPath))
+            label.Text = ComboBox.ItemText(item);
+        else
+            label.BindingContext = item;
     }
 
     /// <summary>A <see cref="SelectorOption"/> row: its SF Symbol, when it names one, then its text.</summary>
     private static UILabel CreateOptionLabel(SelectorOption option, double fontSize)
     {
-        var font = UIFont.SystemFontOfSize((nfloat)fontSize)!;
+        var label = new UILabel
+        {
+            Font = UIFont.SystemFontOfSize((nfloat)fontSize)!,
+            TextColor = UIColor.Label
+        };
+        BindOptionLabel(label, option);
+        return label;
+    }
+
+    /// <summary>Points a <see cref="SelectorOption"/> row's label at another option.</summary>
+    private static void BindOptionLabel(UILabel label, SelectorOption option)
+    {
+        var font = label.Font;
         var text = new NSMutableAttributedString();
 
         if (!string.IsNullOrWhiteSpace(option.SystemIconName) &&
@@ -226,13 +243,7 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, ComboBoxView>
         }
 
         text.Append(new NSAttributedString(option.Text));
-
-        return new UILabel
-        {
-            Font = font,
-            TextColor = UIColor.Label,
-            AttributedText = text
-        };
+        label.AttributedText = text;
     }
 
     private UIView? CreateHeader(ComboBox view) => view.Header switch
@@ -315,7 +326,7 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, ComboBoxView>
 
         _dropdown = new ComboBoxDropdownViewController(
             items,
-            item => CreateItemView(view, view.ItemTemplate, item),
+            new RowFactory(this, view),
             selectedIndex: view.SelectedIndex,
             width: width,
             maxWidth: Math.Min(DropdownMaxWidth, windowWidth),
@@ -393,6 +404,53 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, ComboBoxView>
 
         return controller;
     }
+
+    /// <summary>
+    /// The drop-down's rows: the item template (per template a selector picks), a SelectorOption
+    /// label, or a text label. Recycled rows keep their view and are pointed at the next item.
+    /// </summary>
+    private sealed class RowFactory(ComboBoxHandler handler, ComboBox view) : IComboBoxRowFactory
+    {
+        private readonly DataTemplate? _template = view.ItemTemplate;
+        private readonly Dictionary<DataTemplate, string> _templateKeys = [];
+
+        public string ReuseKey(object item)
+        {
+            if (_template is not null)
+            {
+                var template = Select(_template, item, view) ?? _template;
+                if (!_templateKeys.TryGetValue(template, out var key))
+                    _templateKeys[template] = key = "template-" + _templateKeys.Count;
+                return key;
+            }
+
+            return item is SelectorOption ? "option" : "text";
+        }
+
+        public UIView Create(object item) => handler.CreateItemView(view, _template, item);
+
+        public void Bind(UIView itemView, object item)
+        {
+            switch (itemView)
+            {
+                case MauiViewHost { View: global::Microsoft.Maui.Controls.Label label } when _template is null:
+                    BindTextLabel(view, label, item);
+                    break;
+                case MauiViewHost { View: BindableObject templated }:
+                    templated.BindingContext = item;
+                    break;
+                case UILabel optionLabel when item is SelectorOption option:
+                    BindOptionLabel(optionLabel, option);
+                    break;
+            }
+
+            itemView.SetNeedsLayout();
+        }
+    }
+
+    /// <summary>The template an item gets: a selector's choice, or the template itself.</summary>
+    private static DataTemplate? Select(DataTemplate template, object item, ComboBox view) =>
+        template is DataTemplateSelector selector ? selector.SelectTemplate(item, view) : template;
 
     private sealed record FieldState(
         object? Item, DataTemplate? Template, string? DisplayMemberPath, string Placeholder, double FontSize);

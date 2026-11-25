@@ -18,6 +18,9 @@ internal sealed class MauiViewHost : UIView
     private readonly IView _view;
     private readonly UIView _platformView;
 
+    /// <summary>The hosted MAUI view; a recycled drop-down row rebinds it to another item.</summary>
+    public IView View => _view;
+
     /// <summary>Width used when Auto Layout asks for an intrinsic size.</summary>
     public double LayoutWidth { get; set; }
 
