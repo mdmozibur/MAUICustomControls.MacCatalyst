@@ -125,9 +125,13 @@ namespace MAUICustomControls.MacCatalyst.Platforms.MacCatalyst
             if (VirtualView is not PopoverButton { IsEnabled: true } popoverButton)
                 return;
 
+            // Read before Clicked: a flyout the code opens (OpensOnClick false) is presented by
+            // the Clicked handler itself, and checking afterwards closed it again at once.
+            bool wasPresented = IsPopoverPresented;
+
             popoverButton.RaiseClicked();
 
-            if (IsPopoverPresented)
+            if (wasPresented)
             {
                 HideActivePopover(animated: true);
                 return;

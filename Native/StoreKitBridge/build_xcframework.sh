@@ -48,13 +48,20 @@ mkdir -p "$BUILD_DIR" "$OUTPUT_DIR"
 build_slice arm64
 build_slice x86_64
 
+# Mac Catalyst frameworks are macOS bundles, so they use the versioned layout:
+#   Versions/A/{StoreKitBridge, Resources/Info.plist}, Versions/Current -> A,
+#   StoreKitBridge -> Versions/Current/StoreKitBridge, Resources -> Versions/Current/Resources.
+# App Store Connect rejects a flat (iOS-style) framework in a Mac app (ITMS-90291 / ITMS-90292).
 UNIVERSAL_DIR="$BUILD_DIR/universal/$FRAMEWORK_NAME.framework"
-mkdir -p "$UNIVERSAL_DIR"
+mkdir -p "$UNIVERSAL_DIR/Versions/A/Resources"
 lipo -create \
   "$BUILD_DIR/arm64/$FRAMEWORK_NAME.framework/$FRAMEWORK_NAME" \
   "$BUILD_DIR/x86_64/$FRAMEWORK_NAME.framework/$FRAMEWORK_NAME" \
-  -output "$UNIVERSAL_DIR/$FRAMEWORK_NAME"
-cp "$ROOT_DIR/Info.plist" "$UNIVERSAL_DIR/Info.plist"
+  -output "$UNIVERSAL_DIR/Versions/A/$FRAMEWORK_NAME"
+cp "$ROOT_DIR/Info.plist" "$UNIVERSAL_DIR/Versions/A/Resources/Info.plist"
+ln -s A "$UNIVERSAL_DIR/Versions/Current"
+ln -s "Versions/Current/$FRAMEWORK_NAME" "$UNIVERSAL_DIR/$FRAMEWORK_NAME"
+ln -s Versions/Current/Resources "$UNIVERSAL_DIR/Resources"
 
 # iPad (iOS device). The bundle is flat and declares iPhoneOS, or the device installer rejects it.
 IOS_SDK_PATH="$(xcrun --sdk iphoneos --show-sdk-path)"

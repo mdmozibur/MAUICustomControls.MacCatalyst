@@ -36,7 +36,7 @@
 		</dict>
 		<dict>
 			<key>BinaryPath</key>
-			<string>StoreKitBridge.framework/StoreKitBridge</string>
+			<string>StoreKitBridge.framework/Versions/A/StoreKitBridge</string>
 			<key>LibraryIdentifier</key>
 			<string>ios-arm64_x86_64-maccatalyst</string>
 			<key>LibraryPath</key>

@@ -255,6 +255,36 @@ public sealed class ComboBox : View
     /// <summary>The effective template for the collapsed field.</summary>
     internal DataTemplate? EffectiveSelectedItemTemplate => SelectedItemTemplate ?? ItemTemplate;
 
+    private PresentationElement? _presentationParent;
+
+    /// <summary>
+    /// The logical parent for the MAUI views a platform handler hosts natively (the header, the
+    /// field's selection, the drop-down rows). It passes on BindingContext and resources but, not
+    /// being a VisualElement, not this control's visibility.
+    /// </summary>
+    /// <remarks>
+    /// MAUI 11 works out a view's visibility from its VisualElement ancestors when it is parented
+    /// and refreshes it only for logical children. Parented straight to the combo box, a view built
+    /// while an ancestor was hidden kept its platform view hidden after the ancestor was shown: in
+    /// the CAM pane, which is hidden while it is set up, the header and the selected machine and
+    /// material never appeared. The handler shows and hides these views natively anyway.
+    /// </remarks>
+    internal Element PresentationParent
+    {
+        get
+        {
+            if (_presentationParent is null)
+            {
+                _presentationParent = new PresentationElement();
+                AddLogicalChild(_presentationParent);
+            }
+
+            return _presentationParent;
+        }
+    }
+
+    private sealed class PresentationElement : Element;
+
     internal IReadOnlyList<object> ItemList => _items;
 
     /// <summary>The text a row shows for an item when no template and no DisplayMemberPath apply.</summary>

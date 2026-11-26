@@ -22,6 +22,7 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, ComboBoxView>
         new(ViewMapper)
         {
             ["UseSystemFocusVisuals"] = (handler, view) => handler.PlatformView.Field.SetNeedsLayout(),
+            [nameof(IView.Background)] = MapBackground,
             [nameof(IView.IsEnabled)] = MapIsEnabled,
             [nameof(IView.AutomationId)] = MapAutomationId,
             [nameof(ComboBox.ItemTemplate)] = MapRows,
@@ -100,6 +101,13 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, ComboBoxView>
         handler.UpdateAccessibility();
         ((IView)view).InvalidateMeasure();
     }
+
+    // MAUI paints Background on the platform view, which here is the container, so it filled the
+    // header's row as a grey band (WinUI's ComboBoxBackground in the app's implicit style). In WinUI
+    // the brush belongs to the field's border, never the header; the field draws its own system
+    // fill and hover state, so the container stays clear.
+    private static void MapBackground(ComboBoxHandler handler, ComboBox view) =>
+        handler.PlatformView.BackgroundColor = null;
 
     private static void MapIsEnabled(ComboBoxHandler handler, ComboBox view)
     {
@@ -261,9 +269,10 @@ public sealed class ComboBoxHandler : ViewHandler<ComboBox, ComboBoxView>
         if (MauiContext is null)
             return new UIView();
 
-        // Parenting to the control keeps implicit styles, DynamicResource and RelativeSource
-        // bindings working.
-        mauiView.Parent = VirtualView;
+        // Parenting under the control keeps implicit styles, DynamicResource and RelativeSource
+        // bindings working; going through PresentationParent keeps the control's visibility (and a
+        // hidden ancestor's) from sticking to the hosted view.
+        mauiView.Parent = VirtualView.PresentationParent;
 
         // UWP centres a ComboBox's content vertically (VerticalContentAlignment="Center"), so a
         // templated selection stays centred when the field is taller than its text.

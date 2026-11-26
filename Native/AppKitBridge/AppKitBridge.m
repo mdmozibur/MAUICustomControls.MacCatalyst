@@ -10,6 +10,7 @@
 
 #import <AppKit/AppKit.h>
 #import <objc/runtime.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 typedef int (*AKBShouldTerminate)(void);
 typedef int (*AKBShouldCloseWindow)(long windowNumber);
@@ -846,4 +847,102 @@ int appkit_get_visible_frame(double x, double y, double width, double height,
     *screenWidth = NSWidth(result);
     *screenHeight = NSHeight(result);
     return overlaps;
+}
+
+// Default app for a file extension ("dwg"). The extension's type is whichever installed app's
+// declaration wins for it (another CAD app's exported type when one is installed), so look it up by
+// extension rather than by a fixed identifier.
+static UTType *AKBTypeForExtension(const char *extension)
+{
+    return [UTType typeWithFilenameExtension:[NSString stringWithUTF8String:extension]];
+}
+
+static BOOL AKBIsThisApp(NSURL *applicationURL)
+{
+    NSString *identifier = [NSBundle bundleWithURL:applicationURL].bundleIdentifier;
+    return identifier != nil && [identifier isEqualToString:NSBundle.mainBundle.bundleIdentifier];
+}
+
+// Returns 1 when this app opens files with the extension by default, 0 when another app does (its
+// display name, without ".app", goes to `name`), -1 when no app does or the type is unknown.
+__attribute__((visibility("default")))
+int appkit_get_default_app(const char *extension, char *name, int nameSize)
+{
+    if (nameSize > 0)
+    {
+        name[0] = 0;
+    }
+
+    UTType *type = AKBTypeForExtension(extension);
+    NSURL *application = type == nil ? nil : [[NSWorkspace sharedWorkspace] URLForApplicationToOpenContentType:type];
+    if (application == nil)
+    {
+        return -1;
+    }
+
+    if (AKBIsThisApp(application))
+    {
+        return 1;
+    }
+
+    NSString *displayName = [[NSFileManager defaultManager] displayNameAtPath:application.path];
+    if ([displayName.pathExtension isEqualToString:@"app"])
+    {
+        displayName = displayName.stringByDeletingPathExtension;
+    }
+
+    if (nameSize > 0)
+    {
+        [displayName getCString:name maxLength:(NSUInteger)nameSize encoding:NSUTF8StringEncoding];
+    }
+
+    return 0;
+}
+
+typedef void (*AKBDefaultAppCompletion)(void *context, int changed);
+
+// Makes this app the default for each extension in `extensions` (comma-separated), one after the
+// other: macOS asks the user to confirm each change. Reports how many changed.
+__attribute__((visibility("default")))
+void appkit_make_default_app(const char *extensions, void *context, AKBDefaultAppCompletion completion)
+{
+    NSArray<NSString *> *list = [[NSString stringWithUTF8String:extensions] componentsSeparatedByString:@","];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        __block NSUInteger index = 0;
+        __block int changed = 0;
+        __block void (^next)(void) = nil;
+        void (^step)(void) = ^{
+            if (index >= list.count)
+            {
+                completion(context, changed);
+                next = nil;
+                return;
+            }
+
+            NSString *extension = list[index++];
+            UTType *type = [UTType typeWithFilenameExtension:extension];
+            if (type == nil)
+            {
+                dispatch_async(dispatch_get_main_queue(), next);
+                return;
+            }
+
+            [[NSWorkspace sharedWorkspace] setDefaultApplicationAtURL:NSBundle.mainBundle.bundleURL
+                                                     toOpenContentType:type
+                                                     completionHandler:^(NSError *error) {
+                if (error != nil)
+                {
+                    NSLog(@"AppKitBridge: default app for .%@ (%@) not changed: %@", extension, type.identifier, error);
+                }
+                else
+                {
+                    changed++;
+                }
+
+                dispatch_async(dispatch_get_main_queue(), next);
+            }];
+        };
+        next = step;
+        step();
+    });
 }

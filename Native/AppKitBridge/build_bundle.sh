@@ -23,6 +23,7 @@ for arch in arm64 x86_64; do
     -fobjc-arc \
     -bundle \
     -framework AppKit \
+    -framework UniformTypeIdentifiers \
     "$ROOT_DIR/$NAME.m" \
     -o "$BUILD_DIR/$NAME-$arch"
 done

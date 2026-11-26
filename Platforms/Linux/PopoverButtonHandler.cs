@@ -109,9 +109,13 @@ public sealed class PopoverButtonHandler : AvaloniaContentViewHandler
             return;
         }
 
+        // Read before Clicked: a flyout the code opens (OpensOnClick false) is shown by the
+        // Clicked handler itself, and checking afterwards closed it again at once.
+        bool wasOpen = IsFlyoutOpen;
+
         button.RaiseClicked();
 
-        if (IsFlyoutOpen)
+        if (wasOpen)
         {
             HideFlyout();
             return;

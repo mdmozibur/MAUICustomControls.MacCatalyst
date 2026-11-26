@@ -353,6 +353,80 @@ public static unsafe class AppKitBridge
         }
     }
 
+    /// <summary>
+    /// Which app opens files with this extension ("dwg") by default: true when it is this app,
+    /// false with the other app's name, null when no app does or the plug-in is missing.
+    /// </summary>
+    public static bool? IsDefaultApp(string extension, out string? otherAppName)
+    {
+        otherAppName = null;
+        if (!TryGetExport("appkit_get_default_app", out var getDefault))
+        {
+            return null;
+        }
+
+        var utf8 = System.Text.Encoding.UTF8.GetBytes(extension + "\0");
+        var name = new byte[256];
+        int result;
+        fixed (byte* extensionPointer = utf8)
+        fixed (byte* namePointer = name)
+        {
+            result = ((delegate* unmanaged<byte*, byte*, int, int>)getDefault)(extensionPointer, namePointer, name.Length);
+        }
+
+        if (result < 0)
+        {
+            return null;
+        }
+
+        if (result == 0)
+        {
+            var length = Array.IndexOf(name, (byte)0);
+            otherAppName = System.Text.Encoding.UTF8.GetString(name, 0, length < 0 ? name.Length : length);
+        }
+
+        return result == 1;
+    }
+
+    /// <summary>
+    /// Makes this app the default for each extension (macOS asks the user to confirm each change) and
+    /// completes with how many changed; 0 when the plug-in is missing.
+    /// </summary>
+    public static Task<int> MakeDefaultAppAsync(params string[] extensions)
+    {
+        if (extensions.Length == 0 || !TryGetExport("appkit_make_default_app", out var makeDefault))
+        {
+            return Task.FromResult(0);
+        }
+
+        var completion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handle = GCHandle.Alloc(completion);
+        var utf8 = System.Text.Encoding.UTF8.GetBytes(string.Join(',', extensions) + "\0");
+        try
+        {
+            fixed (byte* pointer = utf8)
+            {
+                ((delegate* unmanaged<byte*, IntPtr, delegate* unmanaged<IntPtr, int, void>, void>)makeDefault)(pointer, GCHandle.ToIntPtr(handle), &OnDefaultAppChanged);
+            }
+        }
+        catch
+        {
+            handle.Free();
+            throw;
+        }
+
+        return completion.Task;
+    }
+
+    [UnmanagedCallersOnly]
+    private static void OnDefaultAppChanged(IntPtr context, int changed)
+    {
+        var handle = GCHandle.FromIntPtr(context);
+        var completion = (TaskCompletionSource<int>)handle.Target!;
+        handle.Free();
+        completion.TrySetResult(changed);
+    }
+
     /// <summary>Opens a Finder window with the item selected.</summary>
     public static bool RevealInFinder(string path)
     {

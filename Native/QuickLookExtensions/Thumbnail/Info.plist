@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>SmartCAD 2D Quick Look Thumbnail</string>
+	<key>CFBundleExecutable</key>
+	<string>SmartCadQuickLookThumbnail</string>
+	<!-- The app build replaces the identifier with $(ApplicationId).QuickLookThumbnail and the
+	     versions with the app's own (ProjectTemplate.csproj, PatchQuickLookExtensions). -->
+	<key>CFBundleIdentifier</key>
+	<string>com.smartcad.smartcad2d.QuickLookThumbnail</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>SmartCadQuickLookThumbnail</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>UIDeviceFamily</key>
+	<array>
+		<integer>6</integer>
+	</array>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.quicklook.thumbnail</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>ThumbnailProvider</string>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<!-- The converter replaces this list with the app's document types and the profile's
+			     documentTypes.otherAppTypes. A file has the type of whichever installed app exports a declaration for its
+			     extension (the app itself only imports com.autodesk.dwg/dxf), so known third-party
+			     DWG/DXF types are listed too. -->
+			<key>QLSupportedContentTypes</key>
+			<array>
+				<string>com.smartcad.smartcad2d.smartcad</string>
+				<string>com.autodesk.dwg</string>
+				<string>com.autodesk.dxf</string>
+				<string>ai.storyteller.cadcraft.dwg</string>
+				<string>ai.storyteller.cadcraft.dxf</string>
+			</array>
+			<key>QLThumbnailMinimumDimension</key>
+			<integer>0</integer>
+		</dict>
+	</dict>
+</dict>
+</plist>

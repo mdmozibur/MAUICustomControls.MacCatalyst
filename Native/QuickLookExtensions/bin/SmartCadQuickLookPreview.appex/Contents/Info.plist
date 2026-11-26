@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>SmartCAD 2D Quick Look Preview</string>
+	<key>CFBundleExecutable</key>
+	<string>SmartCadQuickLookPreview</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.smartcad.smartcad2d.QuickLookPreview</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>SmartCadQuickLookPreview</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>DTPlatformBuild</key>
+	<string>26B118</string>
+	<key>DTPlatformName</key>
+	<string>macosx</string>
+	<key>DTPlatformVersion</key>
+	<string>27.2</string>
+	<key>DTSDKBuild</key>
+	<string>26B118</string>
+	<key>DTSDKName</key>
+	<string>macosx27.2</string>
+	<key>DTXcode</key>
+	<string>27200</string>
+	<key>DTXcodeBuild</key>
+	<string>27B52</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<key>QLIsDataBasedPreview</key>
+			<true/>
+			<key>QLSupportedContentTypes</key>
+			<array>
+				<string>com.smartcad.smartcad2d.smartcad</string>
+				<string>com.autodesk.dwg</string>
+				<string>com.autodesk.dxf</string>
+				<string>ai.storyteller.cadcraft.dwg</string>
+				<string>ai.storyteller.cadcraft.dxf</string>
+			</array>
+			<key>QLSupportsSearchableItems</key>
+			<false/>
+		</dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.quicklook.preview</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>PreviewProvider</string>
+	</dict>
+	<key>UIDeviceFamily</key>
+	<array>
+		<integer>6</integer>
+	</array>
+</dict>
+</plist>
